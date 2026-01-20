@@ -24,6 +24,22 @@ services:
             # - db
             - redis
 
+    # Worker Service for Redis
+    worker:
+        image: blog # ← тот же образ
+        container_name: laravel-worker
+        restart: unless-stopped
+        working_dir: /var/www
+        command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+        volumes:
+            - ./:/var/www
+            - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+        networks:
+            - app-blog-network # ← те же сети, что у app
+        depends_on:
+            - app # ← ждём пока app соберётся
+            - redis
+
     #Nginx Service
     blog-webserver:
         image: nginx:alpine
@@ -77,10 +93,10 @@ services:
         # redis://username:password@87.251.78.17:6973/0
         # username: default
         # password: ${REDIS_PASSWORD}
-        command: redis-server --requirepass ${REDIS_PASSWORD}
+        command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
         ports:
             #    - 87.251.78.17:6973:6379
-            - 127.0.0.1:6973:6973
+            - 87.251.78.17:6973:6973
         volumes:
             - redis-blog:/var/lib/redis
             - ./redis/redis.conf:/usr/local/etc/redis/redis.conf

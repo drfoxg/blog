@@ -3,40 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\FeedbackRequest;
-use App\Services\TelegramService;
+use App\Jobs\SendTelegramMessage;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
 
 class FeedbackController extends Controller
 {
-    public function __construct(
-        private readonly TelegramService $telegram
-    ) {}
-
     public function send(FeedbackRequest $request): JsonResponse
     {
         $data = $request->validated();
-
         $message = $this->formatMessage($data);
 
-        try {
-            $this->telegram->sendMessage($message);
+        // Отправляем в очередь
+        SendTelegramMessage::dispatch($message, $data);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Сообщение отправлено'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Telegram send error', [
-                'error' => $e->getMessage(),
-                'data' => $data
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Ошибка отправки. Попробуйте позже.'
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Сообщение отправлено'
+        ]);
     }
 
     private function formatMessage(array $data): string

@@ -121,3 +121,43 @@ _30 сообщений в секунду разным пользователям
 
 Но даже если у нас будет процессор на 128 ядер и больше 40 Гб только под одни воркеры PHP-FPM, заниматься ожидаем ответа от бота внутри запроса, это антипаттерн.  
 Поэтому нам нужна очередь, например на базе Redis.
+
+UPDATE:
+Очереди настроены и используются разные базы Redis кэша и очередей.
+Теперь запрос обрабатывается от 12 до 32 ms.
+
+#### Лог nginx
+
+```text
+172.21.0.2 - - [20/Jan/2026:20:53:03 +0000] "POST /api/feedback HTTP/1.1" 429 6638 "-" "curl/7.68.0" "217.114.43.138" rt=0.014 uct=0.000 uht=0.013 urt=0.013
+172.21.0.2 - - [20/Jan/2026:20:54:56 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.034 uct=0.001 uht=0.034 urt=0.034
+172.21.0.2 - - [20/Jan/2026:20:54:56 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.016 uct=0.000 uht=0.016 urt=0.016
+172.21.0.2 - - [20/Jan/2026:20:54:57 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.014 uct=0.000 uht=0.014 urt=0.014
+172.21.0.2 - - [20/Jan/2026:20:54:57 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.011 uct=0.000 uht=0.011 urt=0.011
+172.21.0.2 - - [20/Jan/2026:20:54:57 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.013 uct=0.000 uht=0.013 urt=0.013
+172.21.0.2 - - [20/Jan/2026:20:54:57 +0000] "POST /api/feedback HTTP/1.1" 429 6638 "-" "curl/7.68.0" "217.114.43.138" rt=0.012 uct=0.000 uht=0.012 urt=0.012
+172.21.0.2 - - [20/Jan/2026:20:57:51 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.032 uct=0.000 uht=0.032 urt=0.032
+172.21.0.2 - - [20/Jan/2026:20:57:51 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.015 uct=0.000 uht=0.015 urt=0.015
+172.21.0.2 - - [20/Jan/2026:20:57:52 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.012 uct=0.000 uht=0.012 urt=0.012
+172.21.0.2 - - [20/Jan/2026:20:57:52 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.014 uct=0.001 uht=0.013 urt=0.013
+172.21.0.2 - - [20/Jan/2026:20:57:52 +0000] "POST /api/feedback HTTP/1.1" 200 155 "-" "curl/7.68.0" "217.114.43.138" rt=0.013 uct=0.000 uht=0.013 urt=0.013
+172.21.0.2 - - [20/Jan/2026:20:57:53 +0000] "POST /api/feedback HTTP/1.1" 429 6638 "-" "curl/7.68.0" "217.114.43.138" rt=0.012 uct=0.001 uht=0.013 urt=0.013
+```
+
+#### Лог Laravel
+
+```text
+[2026-01-20 20:53:03] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":429,"duration":"5.49ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:54:56] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"13.62ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:54:56] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"7.78ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:54:57] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"7.04ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:54:57] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"5.4ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:54:57] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"7.06ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:54:57] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":429,"duration":"4.87ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:57:51] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"12.62ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:57:51] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"7.03ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:57:52] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"6.66ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:57:52] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"7.42ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:57:52] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"7.08ms","ip":"217.114.43.138","user_id":null}
+[2026-01-20 20:57:53] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":429,"duration":"5.78ms","ip":"217.114.43.138","user_id":null}
+```

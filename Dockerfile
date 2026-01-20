@@ -28,7 +28,9 @@ RUN apt-get update && apt-get install -y \
     net-tools \
     iputils-ping \
     apt-utils \
-    procps
+    procps \
+    libssl-dev \
+    pkg-config
 
 # Locale
 ENV TZ=Europe/Moscow
@@ -55,8 +57,6 @@ RUN curl -sL https://deb.nodesource.com/setup_18.x -o /tmp/nodesource_setup.sh &
     apt install nodejs && \
     npm install npm -g
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install extensions
 RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl
@@ -66,9 +66,14 @@ RUN docker-php-ext-install gd
 RUN docker-php-ext-enable opcache
 
 # Install Redis Extension
-#RUN apk add autoconf && pecl install -o -f redis \
-#    &&  rm -rf /tmp/pear \
-#    &&  docker-php-ext-enable redis && apk del autoconf
+RUN pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get purge -y --auto-remove libssl-dev pkg-config
+# RUN pecl install redis && docker-php-ext-enable redis
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
 
 # Install composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
