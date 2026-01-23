@@ -1,27 +1,23 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Concerns;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class FeedbackRequest extends FormRequest
+trait FeedbackRules
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
-    public function rules(): array
+    protected function feedbackRules(): array
     {
         return [
             'username' => ['required', 'string', 'max:100'],
             'email'    => ['required', 'email', 'max:255'],
             'tg'       => ['nullable', 'string', 'max:100'],
             'message'  => ['nullable', 'string', 'max:2000'],
+            // Антиспам-поля — просто пропускаем, не валидируем
+            'company'         => ['nullable'],
+            'form_started_at' => ['nullable'],
         ];
     }
 
-    public function messages(): array
+    protected function feedbackMessages(): array
     {
         return [
             'username.required' => 'Укажите ваше имя',

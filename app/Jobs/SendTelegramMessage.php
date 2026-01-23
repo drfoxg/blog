@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Services\TelegramService;
+use App\Services\Telegram\V1\TelegramService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -10,6 +10,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Throwable;
+use App\Http\Contracts\TelegramServiceInterface;
 
 class SendTelegramMessage implements ShouldQueue
 {
@@ -31,11 +32,10 @@ class SendTelegramMessage implements ShouldQueue
     public int $timeout = 30;
 
     public function __construct(
-        private string $message,
         private array $data = []
     ) {}
 
-    public function handle(TelegramService $telegram): void
+    public function handle(TelegramServiceInterface $telegram): void
     {
         // Если здесь Exception — Laravel сам:
         // 1. Ловит ошибку
@@ -45,7 +45,7 @@ class SendTelegramMessage implements ShouldQueue
         // 5. Повторяет (попытка 3)
         // 6. Если опять ошибка — вызывает failed()
 
-        $telegram->sendMessage($this->message);
+        $telegram->sendMessage($telegram->formatMessage($this->data));
 
         Log::info('Telegram message sent', [
             'data' => $this->data,
@@ -57,10 +57,12 @@ class SendTelegramMessage implements ShouldQueue
      */
     public function failed(Throwable $exception): void
     {
+        $telegram = app(TelegramServiceInterface::class);
+
         Log::error('Telegram send failed permanently', [
             'error'   => $exception->getMessage(),
             'data'    => $this->data,
-            'message' => $this->message,
+            'message' => $telegram->formatMessage($this->data),
         ]);
     }
 }
