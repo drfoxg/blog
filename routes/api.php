@@ -18,6 +18,6 @@ Route::prefix('v1')->middleware(['antispam', 'deprecated', 'throttle:5,1'])->gro
     Route::post('/feedback', [FeedbackV1::class, 'send']);
 });
 
-Route::prefix('v2')->middleware('antispam', 'throttle:5,1')->group(function () {
+Route::prefix('v2')->middleware(['antispam', 'throttle:5,1'])->group(function () {
     Route::post('/feedback', [FeedbackV2::class, 'send']);
 });
