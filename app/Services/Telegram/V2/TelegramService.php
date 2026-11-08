@@ -41,8 +41,11 @@ class TelegramService extends AbstractTelegramService
             $payload['reply_markup'] = json_encode($replyMarkup);
         }
 
-        $response = Http::timeout(10)
-            ->retry(3, 100)
+        $response = $this->http()
+            ->retry(3, 100, function ($exception) {
+                // Повторяем только на сетевых ошибках и таймаутах
+                return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+            })
             ->post("{$this->apiUrl}/sendMessage", $payload);
 
         return $response->successful() && $response->json('ok', false);
@@ -55,7 +58,7 @@ class TelegramService extends AbstractTelegramService
             '',
             '👤 <b>Имя:</b> ' . e($data['username']),
             '📧 <b>Email:</b> ' . e($data['email']),
-            '📱 <b>Телефон:</b> ' . e($data['phone']),
+            '📱 <b>Телефон:</b> ' . e($data['phone'] ?? '—'),
         ];
 
         if (!empty($data['tg'])) {

@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Services\Telegram\V1;;
+namespace App\Services\Telegram\V1;
+
+;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\RequestException;
@@ -8,7 +10,6 @@ use App\Services\Telegram\AbstractTelegramService;
 
 class TelegramService extends AbstractTelegramService
 {
-
     public function getVersion(): string
     {
         return 'v1';
@@ -21,8 +22,12 @@ class TelegramService extends AbstractTelegramService
      */
     public function sendMessage(string $text, ?string $chatId = null): bool
     {
-        $response = Http::timeout(10)
-            ->retry(3, 100)
+        $response = $this->http()
+            ->retry(3, 100, function ($exception) {
+                // Повторяем только на сетевых ошибках и таймаутах,
+                // не на 4xx (неверный токен/chat_id — повтор не поможет)
+                return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+            })
             ->post("{$this->apiUrl}/sendMessage", [
                 'chat_id'    => $chatId ?? $this->chatId,
                 'text'       => $text,
