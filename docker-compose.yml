@@ -37,9 +37,32 @@ services:
             - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
         networks:
             - app-blog-network # ← те же сети, что у app
+            - sqldev-backend
         depends_on:
             - app # ← ждём пока app соберётся
             - redis
+
+    tgwsapiproxy:
+        image: tgwsapiproxy:latest
+        build:
+            context: ./tgwsapiproxy
+            dockerfile: Dockerfile
+        container_name: tgwsapiproxy
+        restart: unless-stopped
+        command:
+            [
+                "tgwsapiproxy",
+                "--worker-host",
+                "${TGWS_WORKER_HOST}",
+                "--listen-host",
+                "${TGWS_LISTEN_HOST}",
+                "--listen-port",
+                "${TGWS_LISTEN_PORT}",
+                "--http-port",
+                "${TGWS_HTTP_PORT}",
+            ]
+        networks:
+            - app-blog-network
 
     #Nginx Service
     blog-webserver:
