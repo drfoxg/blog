@@ -8,6 +8,7 @@
 .env
 .env.dev
 .env.local
+.env.test
 .env.prod
 .env.backup
 .env.staging
