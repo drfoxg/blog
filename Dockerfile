@@ -1,12 +1,9 @@
-FROM php:8.2.23-fpm
+# ============================================================
+# Stage 1: builder — compile PHP extensions
+# ============================================================
+FROM php:8.2.35-fpm AS builder
 
-# Copy composer.lock and composer.json
-#COPY composer.lock composer.json /var/www/
-
-# Set working directory
-WORKDIR /var/www
-
-# Install dependencies
+# dev packages needed ONLY here; they won't land in the final image
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpng-dev \
@@ -16,6 +13,38 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libonig5 \
     libonig-dev \
+    libssl-dev \
+    pkg-config \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# PHP extensions (compiled here)
+RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl \
+    && docker-php-ext-configure gd \
+    && docker-php-ext-install gd \
+    && docker-php-ext-enable opcache
+
+# Redis from source (workaround for broken pecl)
+ENV PHPREDIS_VERSION=6.2.0
+RUN mkdir -p /usr/src/php/ext/redis \
+    && curl -fsSL https://github.com/phpredis/phpredis/archive/refs/tags/${PHPREDIS_VERSION}.tar.gz \
+       | tar xz -C /usr/src/php/ext/redis --strip-components=1 \
+    && docker-php-ext-install redis
+
+# ============================================================
+# Stage 2: final — runtime without compilers
+# ============================================================
+FROM php:8.2.35-fpm
+
+WORKDIR /var/www
+
+# Runtime libraries only (no -dev), required by the extensions
+RUN apt-get update && apt-get install -y \
+    libpng16-16t64 \
+    libxml2 \
+    libzip5 \
+    libjpeg62-turbo \
+    libfreetype6 \
+    libonig5 \
     locales \
     zip \
     jpegoptim optipng pngquant gifsicle \
@@ -23,70 +52,46 @@ RUN apt-get update && apt-get install -y \
     unzip \
     git \
     curl \
-    software-properties-common \
     mc \
     net-tools \
     iputils-ping \
     apt-utils \
     procps \
-    libssl-dev \
-    pkg-config
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled extensions and their configs from the builder stage
+COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
 # Locale
 ENV TZ=Europe/Moscow
-
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-RUN sed -i -e \
-  's/# ru_RU.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen \
-   && locale-gen
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
+    && sed -i -e 's/# ru_RU.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen
 
 ENV LANG ru_RU.UTF-8
 ENV LANGUAGE ru_RU:ru
 ENV LC_LANG ru_RU.UTF-8
 ENV LC_ALL ru_RU.UTF-8
 
-#npm
-#RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash && \
-#    . ~/.bashrc && \
-#    nvm install v18.18.0 && \
-#    nvm use v18.18.0 && \
-#    npm install npm -g
+# Node.js 24 LTS
+RUN apt-get update && apt-get install -y curl ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN curl -sL https://deb.nodesource.com/setup_18.x -o /tmp/nodesource_setup.sh && \
-    bash /tmp/nodesource_setup.sh && \
-    apt install nodejs && \
-    npm install npm -g
-
-
-# Install extensions
-RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl
-#RUN docker-php-ext-configure gd --with-gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ --with-png-dir=/usr/include/
-RUN docker-php-ext-configure gd
-RUN docker-php-ext-install gd
-RUN docker-php-ext-enable opcache
-
-# Install Redis Extension
-RUN pecl install redis \
-    && docker-php-ext-enable redis \
-    && apt-get purge -y --auto-remove libssl-dev pkg-config
-# RUN pecl install redis && docker-php-ext-enable redis
-
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-
-# Install composer
+# Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Add user for laravel application
-RUN groupadd -g 1000 www
-RUN useradd -u 1000 -ms /bin/bash -g www www
+# Add user for the Laravel application
+RUN groupadd -g 1000 www \
+    && useradd -u 1000 -ms /bin/bash -g www www
 
-# Copy existing application directory contents
-COPY . /var/www
+# Force IPv4 listening (listen = 9000 alone may bind IPv6 only)
+RUN sed -i 's|^;*listen =.*|listen = 0.0.0.0:9000|' /usr/local/etc/php-fpm.d/www.conf
 
-# Copy existing application directory permissions
-COPY --chown=www:www . /var/www
+# Copy existing application directory permissions (Prod only; comment out for Dev)
+# COPY --chown=www:www . /var/www
 
 # Change current user to www
 USER www
