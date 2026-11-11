@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions (compiled here)
-RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl \
+RUN docker-php-ext-install -j$(nproc) pdo_mysql mbstring zip exif pcntl \
     && docker-php-ext-configure gd \
     && docker-php-ext-install gd \
     && docker-php-ext-enable opcache
