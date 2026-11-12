@@ -1,0 +1,128 @@
+{
+    "info": {
+        "name": "Posts API with CSRF",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Get CSRF Token",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Accept",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "https://blog.sulfurfun.ru/",
+                    "protocol": "https",
+                    "host": ["blog", "sulfurfun", "ru"]
+                }
+            },
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "// Сохраняем CSRF токен из cookie в переменную окружения",
+                            "const xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
+                            "if (xsrfCookie) {",
+                            "    const csrfToken = decodeURIComponent(xsrfCookie);",
+                            "    pm.environment.set('csrf_token', csrfToken);",
+                            "    console.log('CSRF token saved:', csrfToken);",
+                            "} else {",
+                            "    console.log('XSRF-TOKEN cookie not found');",
+                            "}"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Get all posts",
+            "request": {
+                "method": "GET",
+                "header": [{ "key": "Accept", "value": "application/json" }],
+                "url": {
+                    "raw": "https://blog.sulfurfun.ru/posts/index",
+                    "protocol": "https",
+                    "host": ["blog", "sulfurfun", "ru"],
+                    "path": ["posts", "index"]
+                }
+            }
+        },
+        {
+            "name": "Get single post",
+            "request": {
+                "method": "GET",
+                "header": [{ "key": "Accept", "value": "application/json" }],
+                "url": {
+                    "raw": "https://blog.sulfurfun.ru/posts/1/show",
+                    "protocol": "https",
+                    "host": ["blog", "sulfurfun", "ru"],
+                    "path": ["posts", "1", "show"]
+                }
+            }
+        },
+        {
+            "name": "Create post",
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Accept", "value": "application/json" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"title\": \"Test Post from Postman\",\n  \"content\": \"This is test content from Postman\",\n  \"description_meta\": \"Meta description\",\n  \"description\": \"Short description\",\n  \"user_id\": 1,\n  \"category_id\": 1\n}"
+                },
+                "url": {
+                    "raw": "https://blog.sulfurfun.ru/posts/1/create",
+                    "protocol": "https",
+                    "host": ["blog", "sulfurfun", "ru"],
+                    "path": ["posts", "1", "create"]
+                }
+            }
+        },
+        {
+            "name": "Update post",
+            "request": {
+                "method": "PATCH",
+                "header": [
+                    { "key": "Accept", "value": "application/json" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"description\": \"Updated description from Postman\"\n}"
+                },
+                "url": {
+                    "raw": "https://blog.sulfurfun.ru/posts/1/update",
+                    "protocol": "https",
+                    "host": ["blog", "sulfurfun", "ru"],
+                    "path": ["posts", "1", "update"]
+                }
+            }
+        },
+        {
+            "name": "Delete post",
+            "request": {
+                "method": "DELETE",
+                "header": [
+                    { "key": "Accept", "value": "application/json" },
+                    { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+                ],
+                "url": {
+                    "raw": "https://blog.sulfurfun.ru/posts/1/delete",
+                    "protocol": "https",
+                    "host": ["blog", "sulfurfun", "ru"],
+                    "path": ["posts", "1", "delete"]
+                }
+            }
+        }
+    ]
+}
