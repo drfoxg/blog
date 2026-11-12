@@ -1,0 +1,16 @@
+{
+    "version": "0.2",
+    "ignorePaths": [
+        "composer.*"
+    ],
+    "dictionaryDefinitions": [],
+    "dictionaries": [],
+    "words": [
+        "залогиненный",
+        "dbblog",
+        "mediable",
+        "uncategorized"
+    ],
+    "ignoreWords": [],
+    "import": []
+}
