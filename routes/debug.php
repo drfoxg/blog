@@ -28,3 +28,8 @@ Route::get('/debug/env', function () {
         'proxies' => explode(',', env('TRUSTED_PROXIES', '')),
     ];
 });
+
+
+Route::get('/my-ip', function () {
+    return request()->ip();
+});
