@@ -175,9 +175,12 @@ dump:
 	@mkdir -p $(BACKUP_DIR)
 	@echo "▶ dump $(ENV) via $(DB_CONTAINER) → $(DUMP_FILE)"
 	$(call load_env) \
-	docker exec -e MYSQL_PWD="$$DB_PASSWORD" $(DB_CONTAINER) sh -c '\
-		mysqldump -h "$$DB_HOST" -u "$$DB_USERNAME" \
-		--single-transaction --routines --triggers --events "$$DB_DATABASE"' \
+	docker exec -e MYSQL_PWD="$$DB_PASSWORD" \
+	            -e DB_USERNAME="$$DB_USERNAME" \
+	            -e DB_DATABASE="$$DB_DATABASE" \
+	  $(DB_CONTAINER) sh -c '\
+		mysqldump -h 127.0.0.1 -u "$$DB_USERNAME" \
+		--single-transaction --no-tablespaces --routines --triggers --events "$$DB_DATABASE"' \
 		> $(DUMP_FILE)
 	@echo "✅ $(DUMP_FILE) ($$(du -h $(DUMP_FILE) | cut -f1))"
 
@@ -188,8 +191,11 @@ restore:
 	$(call confirm_prod,restore)
 	@echo "▶ restore $(FILE) → $(ENV) via $(DB_CONTAINER)"
 	$(call load_env) \
-	docker exec -i -e MYSQL_PWD="$$DB_PASSWORD" $(DB_CONTAINER) sh -c '\
-		mysql -h "$$DB_HOST" -u "$$DB_USERNAME" "$$DB_DATABASE"' \
+	docker exec -i -e MYSQL_PWD="$$DB_PASSWORD" \
+	               -e DB_USERNAME="$$DB_USERNAME" \
+	               -e DB_DATABASE="$$DB_DATABASE" \
+	  $(DB_CONTAINER) sh -c '\
+		mysql -h 127.0.0.1 -u "$$DB_USERNAME" "$$DB_DATABASE"' \
 		< $(FILE)
 	@echo "✅ restored $(FILE) → $(ENV)"
 
