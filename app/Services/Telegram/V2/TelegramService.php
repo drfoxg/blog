@@ -3,7 +3,7 @@
 namespace App\Services\Telegram\V2;
 
 use App\Services\Telegram\AbstractTelegramService;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\ConnectionException;
 
 class TelegramService extends AbstractTelegramService
 {
@@ -18,7 +18,7 @@ class TelegramService extends AbstractTelegramService
             'inline_keyboard' => [[
                 ['text' => '✅ Сохранить', 'callback_data' => 'save'],
                 ['text' => '❌ Удалить', 'callback_data' => 'del'],
-            ]]
+            ]],
         ];
 
         return $this->sendMessageAdvanced($text, $chatId, $replyMarkup);
@@ -31,9 +31,9 @@ class TelegramService extends AbstractTelegramService
         bool $disableNotification = false
     ): bool {
         $payload = [
-            'chat_id'              => $chatId ?? $this->chatId,
-            'text'                 => $text,
-            'parse_mode'           => 'HTML',
+            'chat_id' => $chatId ?? $this->chatId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
             'disable_notification' => $disableNotification,
         ];
 
@@ -44,9 +44,10 @@ class TelegramService extends AbstractTelegramService
         $response = $this->http()
             ->retry(3, 100, function ($exception) {
                 // Повторяем только на сетевых ошибках и таймаутах
-                return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+                return $exception instanceof ConnectionException;
             })
-            ->post("{$this->apiUrl}/sendMessage", $payload);
+            ->post("{$this->apiUrl}/sendMessage", $payload)
+        ;
 
         return $response->successful() && $response->json('ok', false);
     }
@@ -56,13 +57,13 @@ class TelegramService extends AbstractTelegramService
         $lines = [
             '📩 <b>Новая заявка с сайта</b>',
             '',
-            '👤 <b>Имя:</b> ' . e($data['username']),
-            '📧 <b>Email:</b> ' . e($data['email']),
-            '📱 <b>Телефон:</b> ' . e($data['phone'] ?? '—'),
+            '👤 <b>Имя:</b> '.e($data['username']),
+            '📧 <b>Email:</b> '.e($data['email']),
+            '📱 <b>Телефон:</b> '.e($data['phone'] ?? '—'),
         ];
 
         if (!empty($data['tg'])) {
-            $lines[] = '💬 <b>Telegram:</b> ' . e($data['tg']);
+            $lines[] = '💬 <b>Telegram:</b> '.e($data['tg']);
         }
 
         if (!empty($data['message'])) {

@@ -2,32 +2,33 @@
 
 namespace App\Jobs;
 
-use App\Services\Telegram\V1\TelegramService;
+use App\Http\Contracts\TelegramServiceInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Throwable;
-use App\Http\Contracts\TelegramServiceInterface;
 
 class SendTelegramMessage implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     /**
-     * Количество попыток
+     * Количество попыток.
      */
     public int $tries = 3;
 
     /**
-     * Интервал между попытками (секунды)
+     * Интервал между попытками (секунды).
      */
     public array $backoff = [10, 60, 300];
 
     /**
-     * Таймаут выполнения
+     * Таймаут выполнения.
      */
     public int $timeout = 30;
 
@@ -53,15 +54,15 @@ class SendTelegramMessage implements ShouldQueue
     }
 
     /**
-     * Все попытки провалились
+     * Все попытки провалились.
      */
-    public function failed(Throwable $exception): void
+    public function failed(\Throwable $exception): void
     {
         $telegram = app(TelegramServiceInterface::class);
 
         Log::error('Telegram send failed permanently', [
-            'error'   => $exception->getMessage(),
-            'data'    => $this->data,
+            'error' => $exception->getMessage(),
+            'data' => $this->data,
             'message' => $telegram->formatMessage($this->data),
         ]);
     }

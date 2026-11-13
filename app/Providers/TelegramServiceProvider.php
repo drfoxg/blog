@@ -13,7 +13,7 @@ class TelegramServiceProvider extends ServiceProvider
     {
         $this->app->bind(TelegramServiceInterface::class, function () {
             return match (config('api_version.version', 'v1')) {
-                'v2'    => new TelegramV2(),
+                'v2' => new TelegramV2(),
                 default => new TelegramV1(),
             };
         });

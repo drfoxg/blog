@@ -2,11 +2,9 @@
 
 namespace App\Services\Telegram\V1;
 
-;
-
-use Illuminate\Support\Facades\Http;
-use Illuminate\Http\Client\RequestException;
 use App\Services\Telegram\AbstractTelegramService;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 
 class TelegramService extends AbstractTelegramService
 {
@@ -16,7 +14,7 @@ class TelegramService extends AbstractTelegramService
     }
 
     /**
-     * Отправить сообщение в Telegram
+     * Отправить сообщение в Telegram.
      *
      * @throws RequestException
      */
@@ -26,13 +24,14 @@ class TelegramService extends AbstractTelegramService
             ->retry(3, 100, function ($exception) {
                 // Повторяем только на сетевых ошибках и таймаутах,
                 // не на 4xx (неверный токен/chat_id — повтор не поможет)
-                return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+                return $exception instanceof ConnectionException;
             })
             ->post("{$this->apiUrl}/sendMessage", [
-                'chat_id'    => $chatId ?? $this->chatId,
-                'text'       => $text,
+                'chat_id' => $chatId ?? $this->chatId,
+                'text' => $text,
                 'parse_mode' => 'HTML',
-            ]);
+            ])
+        ;
 
         if ($response->failed()) {
             throw new RequestException($response);
@@ -46,12 +45,12 @@ class TelegramService extends AbstractTelegramService
         $lines = [
             '📩 <b>Новая заявка с сайта</b>',
             '',
-            '👤 <b>Имя:</b> ' . e($data['username']),
-            '📧 <b>Email:</b> ' . e($data['email']),
+            '👤 <b>Имя:</b> '.e($data['username']),
+            '📧 <b>Email:</b> '.e($data['email']),
         ];
 
         if (!empty($data['tg'])) {
-            $lines[] = '💬 <b>Telegram:</b> ' . e($data['tg']);
+            $lines[] = '💬 <b>Telegram:</b> '.e($data['tg']);
         }
 
         if (!empty($data['message'])) {

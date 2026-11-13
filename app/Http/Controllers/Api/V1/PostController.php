@@ -2,14 +2,12 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Carbon\Carbon;
-use App\Models\Post;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Post\StoreRequest;
 use App\Http\Requests\Api\V1\Post\UpdateRequest;
 use App\Http\Resources\Post\PostResources;
+use App\Models\Post;
+use Illuminate\Http\Response;
 
 class PostController extends Controller
 {
@@ -31,7 +29,8 @@ class PostController extends Controller
 
         return PostResources::make($post)
             ->response()
-            ->setStatusCode(Response::HTTP_CREATED);
+            ->setStatusCode(Response::HTTP_CREATED)
+        ;
     }
 
     public function update(UpdateRequest $request, Post $post)
@@ -41,7 +40,6 @@ class PostController extends Controller
         $post->update($data);
 
         return PostResources::make($post);
-
     }
 
     public function delete(Post $post)

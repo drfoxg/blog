@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use App\Models\Tag;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class TagController extends Controller
 {
@@ -22,18 +22,16 @@ class TagController extends Controller
     public function store(Request $request)
     {
         $data = [
-            'title' => 'New tag' . random_int(1, 1000),
-            'slug' => 'new-tag-' . random_int(1, 1000),
+            'title' => 'New tag'.random_int(1, 1000),
+            'slug' => 'new-tag-'.random_int(1, 1000),
         ];
 
-        $tag = Tag::create($data);
-
-        return $tag;
+        return Tag::create($data);
     }
 
     public function update(Tag $tag)
     {
-        $tag->update(['title' => 'New tag title '. Carbon::now()]);
+        $tag->update(['title' => 'New tag title '.Carbon::now()]);
 
         return $tag;
     }

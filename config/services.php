@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
@@ -40,5 +39,4 @@ return [
         'chat_id' => env('TELEGRAM_CHAT_ID'),
         'proxy_url' => env('TELEGRAM_PROXY_URL'),
     ],
-
 ];

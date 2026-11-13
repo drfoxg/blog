@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Http\Controllers\PostController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\PostController;
+use Illuminate\Console\Command;
 use Illuminate\Http\Request;
 
 class GoCommand extends Command
@@ -30,10 +30,9 @@ class GoCommand extends Command
     {
         echo $this->description, "\n";
 
-        //$postCtrl = new PostController();
+        // $postCtrl = new PostController();
 
         $postCtrl = new CategoryController();
-
 
         echo 'store', "\n";
         $post = $postCtrl->store(new Request());

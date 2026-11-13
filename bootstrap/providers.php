@@ -1,6 +1,9 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\TelegramServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\TelegramServiceProvider::class,
+    AppServiceProvider::class,
+    TelegramServiceProvider::class,
 ];

@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\FeedbackRequest;
 use App\Jobs\SendTelegramMessage;
-use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
+use Carbon\Exceptions\InvalidFormatException;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Http\JsonResponse;
 
 /**
  * API-контроллер для отправки сообщений обратной связи v1.
@@ -19,13 +21,11 @@ use Carbon\Carbon;
  * добавляет предупреждение о необходимости перехода
  * на следующую версию.
  *
- * @package App\Http\Controllers\Api
- *
  * @see \App\Http\Requests\FeedbackRequest
- * @see \App\Jobs\SendTelegramMessage
+ * @see SendTelegramMessage
  *
- * @throws \Illuminate\Contracts\Container\BindingResolutionException
- * @throws \Carbon\Exceptions\InvalidFormatException
+ * @throws BindingResolutionException
+ * @throws InvalidFormatException
  *
  * @phpstan-type FeedbackResponse array{
  *     success: bool,
@@ -33,18 +33,15 @@ use Carbon\Carbon;
  *     warning?: string
  * }
  */
-
 class FeedbackController extends Controller
 {
     /**
-    * Отправка сообщения обратной связи.
-    *
-    * @param  \App\Http\Requests\FeedbackRequest  $request
-    * @return \Illuminate\Http\JsonResponse
-    *
-    * @phpstan-return \Illuminate\Http\JsonResponse<FeedbackResponse>
-    */
-
+     * Отправка сообщения обратной связи.
+     *
+     * @param \App\Http\Requests\FeedbackRequest $request
+     *
+     * @phpstan-return JsonResponse<FeedbackResponse>
+     */
     public function send(FeedbackRequest $request): JsonResponse
     {
         $data = $request->validated();
@@ -61,7 +58,7 @@ class FeedbackController extends Controller
 
         if ($deprecationDate && Carbon::parse($deprecationDate)->isFuture()) {
             $currentVersion = config('api_version.version');
-            $nextVersion = 'v' . ((int) substr($currentVersion, 1) + 1);
+            $nextVersion = 'v'.((int) substr($currentVersion, 1) + 1);
             $response['warning'] = "API {$currentVersion} устарел. Перейдите на {$nextVersion} до {$deprecationDate}";
         }
 

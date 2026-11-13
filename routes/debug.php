@@ -18,7 +18,7 @@ Route::get('/debug', function (Request $request) {
             'host' => $request->header('Host'),
             'x-forwarded-for' => $request->header('X-Forwarded-For'),
         ],
-        //'server' => $request->server(), // всё что пришло от Nginx/PHP-FPM
+        // 'server' => $request->server(), // всё что пришло от Nginx/PHP-FPM
     ]);
 });
 
@@ -28,7 +28,6 @@ Route::get('/debug/env', function () {
         'proxies' => explode(',', env('TRUSTED_PROXIES', '')),
     ];
 });
-
 
 Route::get('/my-ip', function () {
     return request()->ip();

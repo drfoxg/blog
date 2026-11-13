@@ -5,17 +5,17 @@ namespace App\Http\Contracts;
 interface TelegramServiceInterface
 {
     /**
-     * Отправить сообщение
+     * Отправить сообщение.
      */
     public function sendMessage(string $text, ?string $chatId = null): bool;
 
     /**
-     * Проверить доступность API
+     * Проверить доступность API.
      */
     public function ping(): bool;
 
     /**
-     * Получить версию API
+     * Получить версию API.
      */
     public function getVersion(): string;
 

@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\V1;
 
-use Illuminate\Foundation\Http\FormRequest;
 use App\Http\Requests\Concerns\FeedbackRules;
+use Illuminate\Foundation\Http\FormRequest;
 
 class FeedbackRequest extends FormRequest
 {

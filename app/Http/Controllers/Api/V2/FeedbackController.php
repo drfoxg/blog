@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V2;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V2\FeedbackRequest;
 use App\Jobs\SendTelegramMessage;
+use Carbon\Exceptions\InvalidFormatException;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -18,31 +20,26 @@ use Illuminate\Http\JsonResponse;
  * добавляет предупреждение о необходимости перехода
  * на следующую версию.
  *
- * @package App\Http\Controllers\Api
- *
  * @see \App\Http\Requests\FeedbackRequest
- * @see \App\Jobs\SendTelegramMessage
+ * @see SendTelegramMessage
  *
- * @throws \Illuminate\Contracts\Container\BindingResolutionException
- * @throws \Carbon\Exceptions\InvalidFormatException
+ * @throws BindingResolutionException
+ * @throws InvalidFormatException
  *
  * @phpstan-type FeedbackResponse array{
  *     success: bool,
  *     message: string,
  * }
  */
-
 class FeedbackController extends Controller
 {
     /**
-    * Отправка сообщения обратной связи.
-    *
-    * @param  \App\Http\Requests\FeedbackRequest  $request
-    * @return \Illuminate\Http\JsonResponse
-    *
-    * @phpstan-return \Illuminate\Http\JsonResponse<FeedbackResponse>
-    */
-
+     * Отправка сообщения обратной связи.
+     *
+     * @param \App\Http\Requests\FeedbackRequest $request
+     *
+     * @phpstan-return JsonResponse<FeedbackResponse>
+     */
     public function send(FeedbackRequest $request): JsonResponse
     {
         $data = $request->validated();
@@ -52,7 +49,7 @@ class FeedbackController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Сообщение отправлено'
+            'message' => 'Сообщение отправлено',
         ]);
     }
 }

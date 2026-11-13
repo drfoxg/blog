@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\V2;
 
-use Illuminate\Foundation\Http\FormRequest;
 use App\Http\Requests\Concerns\FeedbackRules;
+use Illuminate\Foundation\Http\FormRequest;
 
 class FeedbackRequest extends FormRequest
 {
@@ -27,9 +27,9 @@ class FeedbackRequest extends FormRequest
         return array_merge(
             $this->feedbackMessages(),
             [
-                'phone.required'    => 'Укажите телефон',
-                'phone.min'         => 'Телефон слишком короткий',
-                'phone.regex'       => 'Некорректный формат телефона',
+                'phone.required' => 'Укажите телефон',
+                'phone.min' => 'Телефон слишком короткий',
+                'phone.regex' => 'Некорректный формат телефона',
             ],
         );
     }

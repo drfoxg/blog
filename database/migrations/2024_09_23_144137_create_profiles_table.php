@@ -4,12 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class extends Migration {
     public const DESCRIPTION_MAX = 1000;
     public const AVATAR_MAX = 500;
 
     /**
-     * Константы для gender
+     * Константы для gender.
      */
     public const GENDER_UNKNOWN = 0;
     public const GENDER_MALE = 1;
@@ -43,15 +43,17 @@ return new class () extends Migration {
 
             // Связь с пользователем (One-to-One)
             $table->foreignId('user_id')
-                  ->unique()
-                  ->constrained()
-                  ->cascadeOnDelete();
+                ->unique()
+                ->constrained()
+                ->cascadeOnDelete()
+            ;
 
             // Реферальная система
             $table->foreignId('parent_id')
-                  ->nullable()
-                  ->constrained('profiles')
-                  ->nullOnDelete();
+                ->nullable()
+                ->constrained('profiles')
+                ->nullOnDelete()
+            ;
 
             $table->timestamps();
 

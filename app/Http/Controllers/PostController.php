@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use App\Models\Post;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class PostController extends Controller
 {
@@ -30,14 +30,12 @@ class PostController extends Controller
             'category_id' => 1,
         ];
 
-        $post = Post::create($data);
-
-        return $post;
+        return Post::create($data);
     }
 
     public function update(Post $post)
     {
-        $post->update(['description' => 'New desc '. Carbon::now()]);
+        $post->update(['description' => 'New desc '.Carbon::now()]);
 
         return $post;
     }

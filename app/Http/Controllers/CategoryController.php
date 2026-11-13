@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use App\Models\Category;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class CategoryController extends Controller
 {
@@ -23,18 +23,16 @@ class CategoryController extends Controller
     {
         $data = [
             'title' => 'New category title',
-            'slug' => 'new-category-title-' . random_int(1, 1000),
+            'slug' => 'new-category-title-'.random_int(1, 1000),
             'is_active' => true,
         ];
 
-        $category = Category::create($data);
-
-        return $category;
+        return Category::create($data);
     }
 
     public function update(Category $category)
     {
-        $category->update(['title' => 'New category title '. Carbon::now()]);
+        $category->update(['title' => 'New category title '.Carbon::now()]);
 
         return $category;
     }

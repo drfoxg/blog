@@ -4,12 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class extends Migration {
     public const CONTENT_MAX = 3000;
     public const AUTHOR_MAX = 255;
 
     /**
-     * Статусы комментариев
+     * Статусы комментариев.
      */
     public const STATUS_PENDING = 0;    // На модерации
     public const STATUS_APPROVED = 1;   // Одобрен
@@ -26,9 +26,10 @@ return new class () extends Migration {
             $table->string('email')->nullable();                       // Email автора (для гостей)
 
             $table->foreignId('user_id')                               // Если комментирует залогиненный пользователь
-                  ->nullable()
-                  ->constrained()
-                  ->cascadeOnDelete();
+                ->nullable()
+                ->constrained()
+                ->cascadeOnDelete()
+            ;
 
             $table->text('content');                                   // text вместо string для длинных комментариев
             $table->unsignedInteger('likes_count')->default(0);
@@ -36,13 +37,15 @@ return new class () extends Migration {
 
             // Внешние ключи с правильными constraints
             $table->foreignId('post_id')
-                  ->constrained()
-                  ->cascadeOnDelete();                                 // Удаляем комментарии при удалении поста
+                ->constrained()
+                ->cascadeOnDelete()                                 // Удаляем комментарии при удалении поста
+            ;
 
             $table->foreignId('parent_id')
-                  ->nullable()
-                  ->constrained('comments')
-                  ->cascadeOnDelete();                                 // Удаляем ответы при удалении родительского комментария
+                ->nullable()
+                ->constrained('comments')
+                ->cascadeOnDelete()                                 // Удаляем ответы при удалении родительского комментария
+            ;
 
             $table->string('ip_address', 45)->nullable();              // IP адрес для модерации
             $table->text('user_agent')->nullable();                    // User agent для модерации
@@ -54,15 +57,10 @@ return new class () extends Migration {
             $table->index('created_at');
             $table->index(['post_id', 'status']);                      // Составной индекс
 
-
-            //! like — зарезервированное слово в SQL
+            // ! like — зарезервированное слово в SQL
             // $table->unsignedInteger('likes')->index();
         });
     }
-
-
-
-
 
     /**
      * Reverse the migrations.

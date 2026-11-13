@@ -2,15 +2,14 @@
 
 namespace App\Http\Middleware;
 
-use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class AntiSpam
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, \Closure $next): Response
     {
-        /**
+        /*
          * Honeypot
          * Поле должно существовать в форме, но быть пустым
          */
@@ -20,7 +19,7 @@ class AntiSpam
 
         /**
          * TODO: Проверка времени заполнения формы
-         * form_started_at — timestamp, который кладём в форму
+         * form_started_at — timestamp, который кладём в форму.
          */
         // $startedAt = (int) $request->input('form_started_at', 0);
 
@@ -34,7 +33,7 @@ class AntiSpam
         // }
 
         /**
-         * Примитивная эвристика текста
+         * Примитивная эвристика текста.
          */
         $text = (string) $request->input('message', '');
 
@@ -52,12 +51,11 @@ class AntiSpam
             'success' => true,
             'message' => 'Сообщение отправлено',
         ]);
-
     }
 
     private function looksLikeSpam(string $text): bool
     {
-        if ($text === '') {
+        if ('' === $text) {
             return false;
         }
 

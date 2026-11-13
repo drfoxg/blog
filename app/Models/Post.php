@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Post extends Model
 {
@@ -17,10 +17,10 @@ class Post extends Model
     use SoftDeletes;
 
     protected $casts = [
-            'published_at' => 'datetime',
-            'is_featured' => 'boolean',
-            'allow_comments' => 'boolean',
-        ];
+        'published_at' => 'datetime',
+        'is_featured' => 'boolean',
+        'allow_comments' => 'boolean',
+    ];
 
     public function user(): BelongsTo
     {
@@ -51,8 +51,9 @@ class Post extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('status', 'published')
-                     ->whereNotNull('published_at')
-                     ->where('published_at', '<=', now());
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+        ;
     }
 
     public function scopeFeatured(Builder $query): Builder

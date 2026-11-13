@@ -21,6 +21,21 @@ abstract class AbstractTelegramService implements TelegramServiceInterface
         $this->proxyUrl = config('services.telegram.proxy_url');
     }
 
+    public function ping(): bool
+    {
+        try {
+            $response = $this->http()->get("{$this->apiUrl}/getMe");
+
+            return $response->successful() && $response->json('ok', false);
+        } catch (\Exception) {
+            return false;
+        }
+    }
+
+    abstract public function sendMessage(string $text, ?string $chatId = null): bool;
+
+    abstract public function getVersion(): string;
+
     /**
      * HTTP-клиент для запросов к Telegram Bot API.
      *
@@ -38,19 +53,4 @@ abstract class AbstractTelegramService implements TelegramServiceInterface
 
         return Http::withOptions($options)->timeout(10);
     }
-
-    public function ping(): bool
-    {
-        try {
-            $response = $this->http()->get("{$this->apiUrl}/getMe");
-
-            return $response->successful() && $response->json('ok', false);
-        } catch (\Exception) {
-            return false;
-        }
-    }
-
-    abstract public function sendMessage(string $text, ?string $chatId = null): bool;
-
-    abstract public function getVersion(): string;
 }

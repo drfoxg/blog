@@ -2,10 +2,10 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -26,13 +26,15 @@ return new class () extends Migration {
             $table->boolean('allow_comments')->default(true);          // Разрешены ли комментарии
 
             $table->foreignId('user_id')
-                  ->constrained()
-                  ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete()
+            ;
 
             $table->foreignId('category_id')
-                  ->default(1)
-                  ->constrained()
-                  ->restrictOnDelete();
+                ->default(1)
+                ->constrained()
+                ->restrictOnDelete()
+            ;
 
             $table->dateTime('published_at')->nullable();
 
@@ -50,15 +52,14 @@ return new class () extends Migration {
                 'posts_feed_idx'
             );
 
-            //! ⚠️ Антипаттерн
+            // ! ⚠️ Антипаттерн
             //  комментарии уже ссылаются на post_id
             //  пост не должен знать про комментарии
             // $table->unsignedBigInteger('comment_id');
-
         });
 
         // MySQL-специфичные оптимизации
-        if (DB::getDriverName() === 'mysql') {
+        if ('mysql' === DB::getDriverName()) {
             // Descending index для сортировки новых постов
             DB::statement('CREATE INDEX posts_published_desc ON posts (published_at DESC)');
 
