@@ -1,4 +1,66 @@
+# --- Зависимости (ставятся внутри образа) ---
 vendor/
 node_modules/
+
+# --- Git ---
 .git/
+.gitignore
+.gitattributes
+.github/
+
+# --- Секреты и локальные env ---
+.env
+.env.*
+!.env.example
+!.env.compose.dev
+!.env.compose.staging
+!.env.compose.prod
+
+# --- Деплойные клоны (не должны попадать в образ) ---
+dev/
+staging/
+prod/
+lessons-blog/
+
+# --- Бэкапы ---
+backups/
+
+# --- Логи и кэш Laravel (должны быть пустыми в образе) ---
 storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*
+!.gitkeep
+
+# --- Тесты и dev-инструменты (не нужны в prod) ---
+tests/
+phpunit.xml
+.php-cs-fixer.php
+.phpunit.cache/
+.phpunit.result.cache
+.prettierignore
+cspell.json
+
+# --- IDE / редакторы ---
+.vscode/
+.idea/
+.fleet/
+*.swp
+*.swo
+
+# --- Docker-файлы (не нужны внутри образа) ---
+Dockerfile
+Dockerfile.prod
+docker-compose*.yml
+.dockerignore
+
+# --- Прочее ---
+*.log
+npm-debug.log
+yarn-error.log
+Homestead.json
+Homestead.yaml
+auth.json
+README.md
+LICENSE
