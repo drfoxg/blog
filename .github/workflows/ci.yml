@@ -64,7 +64,6 @@ jobs:
     name: build
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
@@ -100,7 +99,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          push: true
+          push: ${{ github.event_name == 'push' }}
           tags: |
             ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:sha-${{ steps.vars.outputs.short }}
             ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:latest

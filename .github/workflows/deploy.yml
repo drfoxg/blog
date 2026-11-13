@@ -1,0 +1,124 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, staging, production]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    name: deploy-dev
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Deploy to dev
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/lessons-blog/dev
+            git pull --ff-only
+            docker compose --env-file .env.compose.dev -f docker-compose.yml up -d
+            docker compose --env-file .env.compose.dev -f docker-compose.yml exec -T app php artisan migrate --force
+            docker compose --env-file .env.compose.dev -f docker-compose.yml exec -T app php artisan optimize
+            docker compose --env-file .env.compose.dev -f docker-compose.yml exec -T app php artisan queue:restart
+            curl -fsS https://blog-dev.sulfurfun.ru/up > /dev/null
+
+  deploy-staging:
+    name: deploy-staging
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Deploy to staging
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/lessons-blog/staging
+            git pull --ff-only
+            docker compose --env-file .env.compose.staging -f docker-compose.yml up -d
+            docker compose --env-file .env.compose.staging -f docker-compose.yml exec -T app php artisan migrate --force
+            docker compose --env-file .env.compose.staging -f docker-compose.yml exec -T app php artisan optimize
+            docker compose --env-file .env.compose.staging -f docker-compose.yml exec -T app php artisan queue:restart
+            curl -fsS https://blog-staging.sulfurfun.ru/up > /dev/null
+
+  deploy-prod:
+    name: deploy-prod
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to prod
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/lessons-blog/prod
+            git pull --ff-only
+
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u drfoxg --password-stdin
+
+            cat > .env <<EOF
+            APP_NAME=Laravel
+            APP_ENV=production
+            APP_KEY=${{ secrets.APP_KEY }}
+            APP_DEBUG=false
+            APP_URL=https://blog.sulfurfun.ru
+
+            LOG_CHANNEL=stderr
+            LOG_LEVEL=warning
+
+            DB_CONNECTION=mysql
+            DB_HOST=mysql-dev
+            DB_PORT=3306
+            DB_DATABASE=blog_prod
+            DB_USERNAME=blog_prod_user
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
+            DB_MIGRATOR_USERNAME=blog_prod_migrator
+            DB_MIGRATOR_PASSWORD=${{ secrets.DB_MIGRATOR_PASSWORD }}
+
+            CACHE_STORE=redis
+            QUEUE_CONNECTION=redis
+            SESSION_DRIVER=database
+
+            REDIS_HOST=redis
+            REDIS_PORT=6973
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
+            TELEGRAM_PROXY_URL=http://tgwsapiproxy:8080
+
+            TGWS_WORKER_HOST=${{ secrets.TGWS_WORKER_HOST }}
+            TGWS_LISTEN_HOST=0.0.0.0
+            TGWS_LISTEN_PORT=1080
+            TGWS_HTTP_PORT=8080
+            EOF
+            chmod 600 .env
+
+            export IMAGE_TAG="sha-$(git rev-parse --short HEAD)"
+            docker compose -f docker-compose.prod.yml --env-file .env.compose.prod pull
+            docker compose -f docker-compose.prod.yml --env-file .env.compose.prod up -d
+
+            docker compose -f docker-compose.prod.yml --env-file .env.compose.prod exec -T app \
+              php artisan migrate --force --database=mysql_migrator
+            docker compose -f docker-compose.prod.yml --env-file .env.compose.prod exec -T app \
+              php artisan optimize
+            docker compose -f docker-compose.prod.yml --env-file .env.compose.prod exec -T app \
+              php artisan queue:restart
+
+            curl -fsS https://blog.sulfurfun.ru/up > /dev/null
