@@ -1,0 +1,108 @@
+name: ${COMPOSE_PROJECT_NAME:-blog-prod}
+
+services:
+  app:
+    image: ghcr.io/drfoxg/blog:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    tty: true
+    environment:
+      SERVICE_NAME: app
+      SERVICE_TAGS: prod
+    working_dir: /var/www
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - /tmp:/tmp
+      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - app-blog-network
+      - nginxproxyman
+      - sqldev-backend
+    depends_on:
+      - redis
+
+  worker:
+    image: ghcr.io/drfoxg/blog:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - app-blog-network
+      - sqldev-backend
+    depends_on:
+      - app
+      - redis
+
+  tgwsapiproxy:
+    image: tgwsapiproxy:latest
+    build:
+      context: ./tgwsapiproxy
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 3s
+    command:
+      [
+        "tgwsapiproxy",
+        "--worker-host",
+        "${TGWS_WORKER_HOST}",
+        "--listen-host",
+        "${TGWS_LISTEN_HOST}",
+        "--listen-port",
+        "${TGWS_LISTEN_PORT}",
+        "--http-port",
+        "${TGWS_HTTP_PORT}",
+      ]
+    networks:
+      - app-blog-network
+
+  blog-webserver:
+    image: nginx:alpine
+    restart: unless-stopped
+    tty: true
+    volumes:
+      - ./public:/var/www/public:ro
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/snippets/:/etc/nginx/snippets/
+    networks:
+      - app-blog-network
+      - nginxproxyman
+
+  redis:
+    image: "redis:alpine"
+    restart: unless-stopped
+    tty: true
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    ports:
+      - 127.0.0.1:${REDIS_HOST_PORT:-6975}:6973
+    volumes:
+      - redis-blog:/var/lib/redis
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    environment:
+      - REDIS_REPLICATION_MODE=master
+    networks:
+      - app-blog-network
+
+networks:
+  app-blog-network:
+    driver: bridge
+  nginxproxyman:
+    external: true
+    name: nginxproxyman
+  sqldev-backend:
+    external: true
+    name: sqldev-backend
+
+volumes:
+  redis-blog:
+    driver: local
