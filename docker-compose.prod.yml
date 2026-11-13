@@ -3,6 +3,8 @@ name: ${COMPOSE_PROJECT_NAME:-blog-prod}
 services:
   app:
     image: ghcr.io/drfoxg/blog:${IMAGE_TAG:-latest}
+    env_file:
+      - .env
     restart: unless-stopped
     tty: true
     environment:
@@ -25,6 +27,8 @@ services:
 
   worker:
     image: ghcr.io/drfoxg/blog:${IMAGE_TAG:-latest}
+    env_file:
+      - .env
     restart: unless-stopped
     working_dir: /var/www
     command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600

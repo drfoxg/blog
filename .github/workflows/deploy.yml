@@ -69,8 +69,46 @@ jobs:
             cd ~/lessons-blog/prod
             git pull --ff-only
 
-            # login to GHCR using deploy token (if private packages)
-            # echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u drfoxg --password-stdin
+
+            cat > .env <<EOF
+            APP_NAME=Laravel
+            APP_ENV=production
+            APP_KEY=${{ secrets.APP_KEY }}
+            APP_DEBUG=false
+            APP_URL=https://blog.sulfurfun.ru
+
+            LOG_CHANNEL=stderr
+            LOG_LEVEL=warning
+
+            DB_CONNECTION=mysql
+            DB_HOST=mysql-dev
+            DB_PORT=3306
+            DB_DATABASE=blog_prod
+            DB_USERNAME=blog_prod_user
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
+            DB_MIGRATOR_USERNAME=blog_prod_migrator
+            DB_MIGRATOR_PASSWORD=${{ secrets.DB_MIGRATOR_PASSWORD }}
+
+            CACHE_STORE=redis
+            QUEUE_CONNECTION=redis
+            SESSION_DRIVER=database
+
+            REDIS_HOST=redis
+            REDIS_PORT=6973
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
+            TELEGRAM_PROXY_URL=http://tgwsapiproxy:8080
+
+            TGWS_WORKER_HOST=${{ secrets.TGWS_WORKER_HOST }}
+            TGWS_LISTEN_HOST=0.0.0.0
+            TGWS_LISTEN_PORT=1080
+            TGWS_HTTP_PORT=8080
+            EOF
+            chmod 600 .env
 
             export IMAGE_TAG="sha-$(git rev-parse --short HEAD)"
             docker compose -f docker-compose.prod.yml --env-file .env.compose.prod pull
