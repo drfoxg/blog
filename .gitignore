@@ -21,3 +21,5 @@ yarn-error.log
 /.idea
 /.vscode
 /backups/
+.php-cs-fixer.cache
+*-keys-sorted.txt
