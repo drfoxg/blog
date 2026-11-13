@@ -92,6 +92,7 @@ RUN sed -i 's|^;*listen =.*|listen = 0.0.0.0:9000|' /usr/local/etc/php-fpm.d/www
 
 # --- PROD: copy code into image ---
 COPY --chown=www:www . /var/www
+COPY php/local.ini /usr/local/etc/php/conf.d/local.ini
 
 # Install production dependencies inside the image
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist \
