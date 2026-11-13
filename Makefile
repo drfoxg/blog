@@ -50,27 +50,50 @@ endef
         optimize queue-restart dump restore rollout
 
 help:
-	@echo "Usage:"
-	@echo "  make up      ENV=dev|staging|prod   # docker compose up -d"
-	@echo "  make down    ENV=dev|staging|prod   # docker compose down (prod — с подтверждением)"
-	@echo "  make build   ENV=dev|staging|prod   # docker compose build"
-	@echo "  make restart ENV=dev|staging|prod   # down + up"
-	@echo "  make ps      ENV=dev|staging|prod   # docker compose ps"
-	@echo "  make logs    ENV=dev|staging|prod SERVICE=app"
-	@echo "  make pull    ENV=dev|staging|prod   # docker compose pull"
-	@echo "  make config  ENV=dev|staging|prod   # validate rendered compose"
-	@echo "  make migrate         ENV=dev|staging|prod   # php artisan migrate --force"
-	@echo "  make migrate-status  ENV=dev|staging|prod   # php artisan migrate:status"
-	@echo "  make seed            ENV=dev|staging|prod   # php artisan db:seed --force"
-	@echo "  make tinker          ENV=dev|staging|prod   # php artisan tinker"
-	@echo "  make shell           ENV=dev|staging|prod SERVICE=app"
-	@echo "  make health          ENV=dev|staging|prod   # curl /up"
-	@echo "  make optimize        ENV=dev|staging|prod   # config/route/view/event cache"
-	@echo "  make queue-restart   ENV=dev|staging|prod   # restart worker"
-	@echo "  make dump            ENV=dev|staging|prod   # mysqldump --single-transaction"
-	@echo "  make restore         ENV=dev|staging|prod FILE=path.sql"
-	@echo "  make rollout         ENV=dev|staging|prod   # docker rollout (если установлен)"
-	@echo "  make up-all / down-all / build-all / migrate-status-all"
+	@echo "Usage: make <target> ENV=dev|staging|prod [ARGS=\"...\"] [SERVICE=...] [FILE=...]"
+	@echo ""
+	@echo "Lifecycle:"
+	@echo "  up            docker compose up -d"
+	@echo "  down          docker compose down (prod — с подтверждением)"
+	@echo "  restart       down + up"
+	@echo "  build         docker compose build"
+	@echo "  pull          docker compose pull"
+	@echo "  ps            docker compose ps"
+	@echo "  logs          docker compose logs -f SERVICE (default: all)"
+	@echo "  config        validate rendered compose"
+	@echo ""
+	@echo "Laravel / artisan:"
+	@echo "  migrate           php artisan migrate --force"
+	@echo "  migrate-status    php artisan migrate:status"
+	@echo "  seed              php artisan db:seed --force"
+	@echo "  tinker            php artisan tinker"
+	@echo "  shell             sh inside SERVICE (default: app)"
+	@echo "  optimize          php artisan optimize"
+	@echo "  queue-restart     php artisan queue:restart"
+	@echo ""
+	@echo "Code quality:"
+	@echo "  php-cs-fixer      vendor/bin/php-cs-fixer fix ARGS"
+	@echo "                    e.g. make php-cs-fixer ENV=dev ARGS=\"--dry-run --diff\""
+	@echo ""
+	@echo "Health:"
+	@echo "  health            curl https://<env-domain>/up"
+	@echo ""
+	@echo "DB backups:"
+	@echo "  dump              mysqldump --single-transaction → ./backups/<env>_<ts>.sql"
+	@echo "  restore           mysql < FILE (FILE=path.sql)"
+	@echo ""
+	@echo "Zero-downtime (optional):"
+	@echo "  rollout           docker rollout (если установлен docker-rollout)"
+	@echo ""
+	@echo "All environments:"
+	@echo "  up-all / down-all / build-all / migrate-status-all"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make up ENV=dev"
+	@echo "  make logs ENV=staging SERVICE=worker"
+	@echo "  make php-cs-fixer ENV=dev ARGS=\"--dry-run --diff\""
+	@echo "  make dump ENV=prod"
+	@echo "  make restore ENV=staging FILE=./backups/dev_20261113_112539.sql"
 
 # ---------- single env ----------
 
@@ -154,6 +177,13 @@ queue-restart:
 	$(call confirm_prod,queue-restart)
 	$(call load_env) \
 	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) php artisan queue:restart
+
+# ---------- code quality ----------
+
+php-cs-fixer:
+	$(call check_env)
+	$(call load_env) \
+	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) vendor/bin/php-cs-fixer fix $(ARGS)
 
 # ---------- healthcheck ----------
 
