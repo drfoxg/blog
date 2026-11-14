@@ -9,6 +9,8 @@ services:
     restart: unless-stopped
     tty: true
     working_dir: /var/www
+    env_file:
+      - .env
     environment:
       SERVICE_NAME: app
       SERVICE_TAGS: dev
@@ -28,6 +30,8 @@ services:
     image: blog
     restart: unless-stopped
     working_dir: /var/www
+    env_file:
+      - .env
     command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
     depends_on:
       app:
@@ -81,6 +85,8 @@ services:
     restart: unless-stopped
     tty: true
     command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    env_file:
+      - .env
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_REPLICATION_MODE=master
