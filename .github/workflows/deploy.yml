@@ -24,6 +24,7 @@ jobs:
             set -euo pipefail
             cd ~/lessons-blog/dev
             git pull --ff-only
+            docker compose --env-file .env.compose.dev -f docker-compose.yml down
             docker compose --env-file .env.compose.dev -f docker-compose.yml up -d
             docker compose --env-file .env.compose.dev -f docker-compose.yml exec -T app php artisan migrate --force
             docker compose --env-file .env.compose.dev -f docker-compose.yml exec -T app php artisan optimize
@@ -46,6 +47,7 @@ jobs:
             set -euo pipefail
             cd ~/lessons-blog/staging
             git pull --ff-only
+            docker compose --env-file .env.compose.dev -f docker-compose.yml down
             docker compose --env-file .env.compose.staging -f docker-compose.yml up -d
             docker compose --env-file .env.compose.staging -f docker-compose.yml exec -T app php artisan migrate --force
             docker compose --env-file .env.compose.staging -f docker-compose.yml exec -T app php artisan optimize
