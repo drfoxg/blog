@@ -15,17 +15,26 @@
 #   make queue-restart ENV=prod
 #   make tinker ENV=dev
 #   make shell ENV=dev SERVICE=app
+#   make git-pr STALE_BRANCH=fix/xxx
+#   make git-pr-checks STALE_BRANCH=fix/xxx
+#   make git-pr-merge STALE_BRANCH=fix/xxx
+#   make git-sync STALE_BRANCH=fix/xxx
+#   make git-clean-merged
 
 SHELL := /bin/bash
 
 ENV ?= dev
 SERVICE ?=
 APP_SERVICE ?= app
-DB_CONTAINER ?= mysql-dev          # ← контейнер БД (внешний, не в compose)
+DB_CONTAINER ?= mysql-dev
 COMPOSE_FILE := docker-compose.yml
 ENV_FILE := .env.compose.$(ENV)
 BACKUP_DIR ?= ./backups
 DUMP_FILE ?= $(BACKUP_DIR)/$(ENV)_$(shell date +%Y%m%d_%H%M%S).sql
+
+# ---------- git ----------
+MAIN_BRANCH ?= main
+STALE_BRANCH ?=
 
 # Проверка, что файл окружения существует
 define check_env
@@ -45,12 +54,32 @@ define confirm_prod
 	fi
 endef
 
+# Защита: не даём checkout/pull, если есть незакоммиченные изменения
+define check_clean
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "❌ working tree not clean. commit/stash first:"; \
+		git status --short; \
+		exit 1; \
+	fi
+endef
+
+# Требуем явно задать STALE_BRANCH, и запрещаем main/master/develop
+define require_stale_branch
+	@test -n "$(STALE_BRANCH)" || (echo "❌ STALE_BRANCH is required. Usage: make <target> STALE_BRANCH=fix|feat/xxx"; exit 1)
+	@case "$(STALE_BRANCH)" in \
+		$(MAIN_BRANCH)|master|develop) \
+			echo "❌ cannot use protected branch as STALE_BRANCH: $(STALE_BRANCH)"; exit 1 ;; \
+	esac
+endef
+
 .PHONY: help up down build restart ps logs pull config up-all down-all build-all \
         migrate migrate-status migrate-status-all seed tinker shell health \
-        optimize queue-restart dump restore rollout
+        optimize queue-restart dump restore rollout php-cs-fixer \
+        git-pr git-pr-checks git-pr-merge git-sync git-checkout-main git-pull \
+        git-clean-branch git-prune git-status git-clean-merged
 
 help:
-	@echo "Usage: make <target> ENV=dev|staging|prod [ARGS=\"...\"] [SERVICE=...] [FILE=...]"
+	@echo "Usage: make <target> ENV=dev|staging|prod [ARGS=\"...\"] [SERVICE=...] [FILE=...] [STALE_BRANCH=...]"
 	@echo ""
 	@echo "Lifecycle:"
 	@echo "  up            docker compose up -d"
@@ -85,6 +114,18 @@ help:
 	@echo "Zero-downtime (optional):"
 	@echo "  rollout           docker rollout (если установлен docker-rollout)"
 	@echo ""
+	@echo "Git (PR workflow):"
+	@echo "  git-pr            gh pr create --base $(MAIN_BRANCH) --head STALE_BRANCH --fill"
+	@echo "  git-pr-checks     gh pr checks STALE_BRANCH --watch"
+	@echo "  git-pr-merge      gh pr merge STALE_BRANCH --squash --delete-branch, then git-sync"
+	@echo ""
+	@echo "Git (sync/cleanup):"
+	@echo "  git-sync STALE_BRANCH=fix|feat/xxx"
+	@echo "                    checkout $(MAIN_BRANCH) → pull → branch -d STALE_BRANCH → fetch --prune"
+	@echo "  git-clean-merged  удалить все локальные ветки, слитые в $(MAIN_BRANCH)"
+	@echo "                    (кроме $(MAIN_BRANCH)/master/develop)"
+	@echo "  git-status        краткий статус + текущая ветка"
+	@echo ""
 	@echo "All environments:"
 	@echo "  up-all / down-all / build-all / migrate-status-all"
 	@echo ""
@@ -94,6 +135,10 @@ help:
 	@echo "  make php-cs-fixer ENV=dev ARGS=\"--dry-run --diff\""
 	@echo "  make dump ENV=prod"
 	@echo "  make restore ENV=staging FILE=./backups/dev_20261113_112539.sql"
+	@echo "  make git-pr STALE_BRANCH=fix/dev-redis-healthcheck"
+	@echo "  make git-pr-merge STALE_BRANCH=fix/dev-redis-healthcheck"
+	@echo "  make git-sync STALE_BRANCH=fix/deploy-stability"
+	@echo "  make git-clean-merged"
 
 # ---------- single env ----------
 
@@ -237,6 +282,72 @@ rollout:
 	@command -v docker-rollout >/dev/null 2>&1 || (echo "❌ docker-rollout not installed"; exit 1)
 	$(call load_env) \
 	docker rollout $(APP_SERVICE) --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
+
+# ---------- git: PR workflow ----------
+
+git-pr:
+	$(call require_stale_branch)
+	@echo "▶ creating PR $(STALE_BRANCH) → $(MAIN_BRANCH)"
+	gh pr create --base $(MAIN_BRANCH) --head $(STALE_BRANCH) --fill
+
+git-pr-checks:
+	$(call require_stale_branch)
+	@echo "▶ watching checks for $(STALE_BRANCH)"
+	gh pr checks $(STALE_BRANCH) --watch
+
+git-pr-merge:
+	$(call require_stale_branch)
+	@echo "▶ merging PR $(STALE_BRANCH) → $(MAIN_BRANCH)"
+	gh pr merge $(STALE_BRANCH) --squash --delete-branch
+	$(MAKE) git-sync STALE_BRANCH=$(STALE_BRANCH)
+
+# ---------- git: sync/cleanup ----------
+
+git-sync:
+	$(call require_stale_branch)
+	$(MAKE) git-checkout-main
+	$(MAKE) git-pull
+	$(MAKE) git-clean-branch
+	$(MAKE) git-prune
+	@echo "✅ git sync done ($(MAIN_BRANCH), removed $(STALE_BRANCH), pruned)"
+
+git-checkout-main:
+	$(call check_clean)
+	@echo "▶ git checkout $(MAIN_BRANCH)"
+	git checkout $(MAIN_BRANCH)
+
+git-pull:
+	$(call check_clean)
+	@echo "▶ git pull"
+	git pull
+
+git-clean-branch:
+	$(call require_stale_branch)
+	@echo "▶ git branch -d $(STALE_BRANCH) (skip if missing)"
+	@if git show-ref --verify --quiet refs/heads/$(STALE_BRANCH); then \
+		git branch -d $(STALE_BRANCH); \
+	else \
+		echo "ℹ️  $(STALE_BRANCH) not found, skip"; \
+	fi
+
+git-prune:
+	@echo "▶ git fetch --prune"
+	git fetch --prune
+
+git-status:
+	@git status -sb
+	@echo "---"
+	@echo "current branch: $$(git rev-parse --abbrev-ref HEAD)"
+	@echo "main branch:    $(MAIN_BRANCH)"
+	@echo "stale branch:   $${STALE_BRANCH:-(not set)}"
+
+git-clean-merged:
+	@echo "▶ deleting local branches merged into $(MAIN_BRANCH) (except $(MAIN_BRANCH)/master/develop)"
+	@git branch --merged $(MAIN_BRANCH) \
+		| sed 's/^[* ] //' \
+		| grep -vE '^($(MAIN_BRANCH)|master|develop)$$' \
+		| grep -v '^$$' \
+		| xargs -r -n1 git branch -d
 
 # ---------- all envs ----------
 
