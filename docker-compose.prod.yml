@@ -48,10 +48,7 @@ services:
         max-file: "3"
 
   tgwsapiproxy:
-    image: tgwsapiproxy:latest
-    build:
-      context: ./tgwsapiproxy
-      dockerfile: Dockerfile
+    image: ghcr.io/drfoxg/tgwsapiproxy:${IMAGE_TAG:-latest}
     restart: unless-stopped
     stop_grace_period: 3s
     command:
