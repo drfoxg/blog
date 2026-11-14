@@ -3,46 +3,49 @@ name: ${COMPOSE_PROJECT_NAME:-blog-prod}
 services:
   app:
     image: ghcr.io/drfoxg/blog:${IMAGE_TAG:-latest}
-    env_file:
-      - .env
     restart: unless-stopped
     tty: true
+    working_dir: /var/www
+    env_file:
+      - .env
     environment:
       SERVICE_NAME: app
       SERVICE_TAGS: prod
-    working_dir: /var/www
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    depends_on:
+      redis:
+        condition: service_healthy
     volumes:
       - /tmp:/tmp
     networks:
       - app-blog-network
       - nginxproxyman
       - sqldev-backend
-    depends_on:
-      - redis
-
-  worker:
-    image: ghcr.io/drfoxg/blog:${IMAGE_TAG:-latest}
-    env_file:
-      - .env
-    restart: unless-stopped
-    working_dir: /var/www
-    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+
+  worker:
+    image: ghcr.io/drfoxg/blog:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    env_file:
+      - .env
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_healthy
     networks:
       - app-blog-network
       - sqldev-backend
-    depends_on:
-      - app
-      - redis
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   tgwsapiproxy:
     image: tgwsapiproxy:latest
@@ -70,19 +73,21 @@ services:
     image: ghcr.io/drfoxg/blog-nginx:${IMAGE_TAG:-latest}
     restart: unless-stopped
     tty: true
+    networks:
+      - app-blog-network
+      - nginxproxyman
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    networks:
-      - app-blog-network
-      - nginxproxyman
 
   redis:
     image: "redis:alpine"
     restart: unless-stopped
     tty: true
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     command: >
       redis-server
       --bind 0.0.0.0
@@ -91,11 +96,21 @@ services:
       --maxmemory 256mb
       --maxmemory-policy volatile-lru
     ports:
-      - 127.0.0.1:${REDIS_HOST_PORT:-6973}:6973
+      - 127.0.0.1:${REDIS_HOST_PORT:-6975}:6973
     volumes:
       - redis-blog:/var/lib/redis
     networks:
       - app-blog-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'redis-cli -p 6973 -a "$$REDIS_PASSWORD" ping | grep -q PONG',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
 networks:
   app-blog-network:
