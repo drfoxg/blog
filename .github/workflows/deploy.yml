@@ -110,7 +110,9 @@ jobs:
             TGWS_LISTEN_PORT=1080
             TGWS_HTTP_PORT=8080
             EOF
+
             chmod 600 .env
+            set -a; source .env; set +a
 
             export IMAGE_TAG="sha-$(git rev-parse --short HEAD)"
             docker compose -f docker-compose.prod.yml --env-file .env.compose.prod pull
