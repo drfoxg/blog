@@ -21,7 +21,7 @@ class GoCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Go Command description';
+    protected $description = 'Go Command description 1';
 
     /**
      * Execute the console command.
