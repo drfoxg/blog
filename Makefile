@@ -30,7 +30,13 @@ ENV ?= dev
 SERVICE ?=
 APP_SERVICE ?= app
 DB_CONTAINER ?= mysql-dev
+
+ifeq ($(ENV),prod)
+COMPOSE_FILE := docker-compose.prod.yml
+else
 COMPOSE_FILE := docker-compose.yml
+endif
+
 ENV_FILE := .env.compose.$(ENV)
 BACKUP_DIR ?= ./backups
 DUMP_FILE ?= $(BACKUP_DIR)/$(ENV)_$(shell date +%Y%m%d_%H%M%S).sql

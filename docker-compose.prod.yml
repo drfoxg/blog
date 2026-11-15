@@ -29,8 +29,9 @@ services:
   worker:
     image: ghcr.io/drfoxg/blog:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    stop_grace_period: 70s
     working_dir: /var/www
-    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=60 --max-time=3600
     env_file:
       - .env
     depends_on:
