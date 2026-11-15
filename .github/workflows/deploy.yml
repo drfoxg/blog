@@ -25,6 +25,7 @@ jobs:
             cd ~/lessons-blog/dev
             git pull --ff-only
             docker compose --env-file .env.compose.dev --env-file .env -f docker-compose.yml down
+            docker compose --env-file .env.compose.dev --env-file .env -f docker-compose.yml build
             docker compose --env-file .env.compose.dev --env-file .env -f docker-compose.yml up -d
             docker compose --env-file .env.compose.dev --env-file .env -f docker-compose.yml exec -T app php artisan migrate --force
             docker compose --env-file .env.compose.dev --env-file .env -f docker-compose.yml exec -T app php artisan optimize
@@ -48,6 +49,7 @@ jobs:
             cd ~/lessons-blog/staging
             git pull --ff-only
             docker compose --env-file .env.compose.staging --env-file .env -f docker-compose.yml down
+            docker compose --env-file .env.compose.staging --env-file .env -f docker-compose.yml build
             docker compose --env-file .env.compose.staging --env-file .env -f docker-compose.yml up -d
             docker compose --env-file .env.compose.staging --env-file .env -f docker-compose.yml exec -T app php artisan migrate --force
             docker compose --env-file .env.compose.staging --env-file .env -f docker-compose.yml exec -T app php artisan optimize
