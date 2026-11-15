@@ -41,20 +41,20 @@ Route::get('/debug/jit-check', function () {
     $start = hrtime(true);
 
     $sum = 0;
-    for ($i = 0; $i < $iterations; $i++) {
+    for ($i = 0; $i < $iterations; ++$i) {
         $sum += $i * 2;
     }
 
     $elapsedNs = hrtime(true) - $start;
     $elapsedMs = $elapsedNs / 1_000_000;
 
-    if ($status === false) {
+    if (false === $status) {
         return response()->json([
             'opcache' => 'inactive',
             'message' => 'OPcache is not active (opcache.enable=0 or not loaded)',
             'benchmark' => [
                 'iterations' => $iterations,
-                'sum'        => $sum,
+                'sum' => $sum,
                 'elapsed_ms' => round($elapsedMs, 3),
                 'elapsed_ns' => $elapsedNs,
             ],
@@ -65,22 +65,22 @@ Route::get('/debug/jit-check', function () {
 
     return response()->json([
         'opcache' => [
-            'enabled'        => $status['opcache_enabled'] ?? null,
-            'memory_used'    => $status['memory_usage']['used_memory'] ?? null,
-            'memory_free'    => $status['memory_usage']['free_memory'] ?? null,
-            'memory_wasted'  => $status['memory_usage']['wasted_memory'] ?? null,
+            'enabled' => $status['opcache_enabled'] ?? null,
+            'memory_used' => $status['memory_usage']['used_memory'] ?? null,
+            'memory_free' => $status['memory_usage']['free_memory'] ?? null,
+            'memory_wasted' => $status['memory_usage']['wasted_memory'] ?? null,
             'cached_scripts' => $status['opcache_statistics']['num_cached_scripts'] ?? null,
-            'hits'           => $status['opcache_statistics']['hits'] ?? null,
-            'misses'         => $status['opcache_statistics']['misses'] ?? null,
+            'hits' => $status['opcache_statistics']['hits'] ?? null,
+            'misses' => $status['opcache_statistics']['misses'] ?? null,
         ],
         'jit' => [
-            'on'          => $jit['on'] ?? null,
+            'on' => $jit['on'] ?? null,
             'buffer_size' => $jit['buffer_size'] ?? null,
             'buffer_free' => $jit['buffer_free'] ?? null,
         ],
         'benchmark' => [
             'iterations' => $iterations,
-            'sum'        => $sum,
+            'sum' => $sum,
             'elapsed_ms' => round($elapsedMs, 3),
             'elapsed_ns' => $elapsedNs,
         ],
