@@ -29,10 +29,11 @@ services:
   worker:
     image: blog
     restart: unless-stopped
+    stop_grace_period: 70s
     working_dir: /var/www
     env_file:
       - .env
-    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=60 --max-time=3600
     depends_on:
       app:
         condition: service_started
