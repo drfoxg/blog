@@ -36,7 +36,7 @@ Route::get('/my-ip', function () {
 Route::get('/debug/jit-check', function () {
     $status = opcache_get_status(false);
 
-    // --- бенчмарк: простой CPU-bound цикл без I/O ---
+    // бенчмарк: простой CPU-bound цикл без I/O
     $iterations = 100_000;
     $start = hrtime(true);
 
