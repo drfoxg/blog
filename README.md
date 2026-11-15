@@ -171,5 +171,3 @@ UPDATE:
   - `make validate` — проверка `ci.yml` (`actionlint`) и `Makefile` (`make -n`)
   - `make git-pr`/`git-pr-merge` — PR-workflow через `gh`
   - Защита: `confirm_prod` (подтверждение для prod), `check_clean` (не даёт checkout с грязным деревом), `require_stale_branch` (не даёт удалить `main`)
-
-Тест сi
