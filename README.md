@@ -161,3 +161,13 @@ UPDATE:
 [2026-01-20 20:57:52] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":200,"duration":"7.08ms","ip":"217.114.43.138","user_id":null}
 [2026-01-20 20:57:53] production.INFO: Request completed {"method":"POST","uri":"/api/feedback","status":429,"duration":"5.78ms","ip":"217.114.43.138","user_id":null}
 ```
+
+## Инструменты
+
+- `Makefile` в [drfoxg/blog](https://github.com/drfoxg/blog/blob/main/Makefile) — единый интерфейс для трёх окружений:
+  - `make up ENV=dev|staging|prod` — поднять окружение
+  - `make migrate ENV=...` — миграции (с подтверждением для prod)
+  - `make dump`/`make restore` — бэкапы (через `mysql-dev`, `--single-tablespaces`)
+  - `make validate` — проверка `ci.yml` (`actionlint`) и `Makefile` (`make -n`)
+  - `make git-pr`/`git-pr-merge` — PR-workflow через `gh`
+  - Защита: `confirm_prod` (подтверждение для prod), `check_clean` (не даёт checkout с грязным деревом), `require_stale_branch` (не даёт удалить `main`)
