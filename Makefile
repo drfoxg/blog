@@ -15,6 +15,9 @@
 #   make queue-restart ENV=prod
 #   make tinker ENV=dev
 #   make shell ENV=dev SERVICE=app
+#   make validate
+#   make validate-ci
+#   make validate-makefile
 #   make git-pr STALE_BRANCH=fix/xxx
 #   make git-pr-checks STALE_BRANCH=fix/xxx
 #   make git-pr-merge STALE_BRANCH=fix/xxx
@@ -75,6 +78,7 @@ endef
 .PHONY: help up down build restart ps logs pull config up-all down-all build-all \
         migrate migrate-status migrate-status-all seed tinker shell health \
         optimize queue-restart dump restore rollout php-cs-fixer \
+        validate validate-ci validate-makefile \
         git-pr git-pr-checks git-pr-merge git-sync git-checkout-main git-pull \
         git-clean-branch git-prune git-status git-clean-merged
 
@@ -103,6 +107,11 @@ help:
 	@echo "Code quality:"
 	@echo "  php-cs-fixer      vendor/bin/php-cs-fixer fix ARGS"
 	@echo "                    e.g. make php-cs-fixer ENV=dev ARGS=\"--dry-run --diff\""
+	@echo ""
+	@echo "Validation:"
+	@echo "  validate          make -n (help/up/git-pr) + actionlint (ci.yml)"
+	@echo "  validate-makefile make -n help/up/git-pr (syntax check)"
+	@echo "  validate-ci       actionlint .github/workflows/ci.yml"
 	@echo ""
 	@echo "Health:"
 	@echo "  health            curl https://<env-domain>/up"
@@ -135,6 +144,7 @@ help:
 	@echo "  make php-cs-fixer ENV=dev ARGS=\"--dry-run --diff\""
 	@echo "  make dump ENV=prod"
 	@echo "  make restore ENV=staging FILE=./backups/dev_20261113_112539.sql"
+	@echo "  make validate"
 	@echo "  make git-pr STALE_BRANCH=fix/dev-redis-healthcheck"
 	@echo "  make git-pr-merge STALE_BRANCH=fix/dev-redis-healthcheck"
 	@echo "  make git-sync STALE_BRANCH=fix/deploy-stability"
@@ -229,6 +239,26 @@ php-cs-fixer:
 	$(call check_env)
 	$(call load_env) \
 	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) vendor/bin/php-cs-fixer fix $(ARGS)
+
+# ---------- validation ----------
+
+validate-ci:
+	@command -v actionlint >/dev/null 2>&1 || (echo "❌ actionlint not installed. Install: go install github.com/rhysd/actionlint/cmd/actionlint@latest"; exit 1)
+	@echo "▶ actionlint .github/workflows/ci.yml"
+	actionlint .github/workflows/ci.yml
+	@echo "✅ ci.yml OK"
+
+validate-makefile:
+	@echo "▶ make -n help"
+	@make -n help >/dev/null
+	@echo "▶ make -n up ENV=dev"
+	@make -n up ENV=dev >/dev/null
+	@echo "▶ make -n git-pr STALE_BRANCH=test/validate"
+	@make -n git-pr STALE_BRANCH=test/validate >/dev/null
+	@echo "✅ Makefile OK"
+
+validate: validate-makefile validate-ci
+	@echo "✅ all validations passed"
 
 # ---------- healthcheck ----------
 
