@@ -23,6 +23,7 @@
 #   make git-pr-merge STALE_BRANCH=fix/xxx
 #   make git-sync STALE_BRANCH=fix/xxx
 #   make git-sync-env ENV_BRANCH=staging
+#   make wait-workflow WORKFLOW=ci.yml BRANCH=main COMMIT_SHA=<sha>
 #   make git-sync-all-envs
 #   make release STALE_BRANCH=fix/xxx
 #   make git-clean-merged
@@ -55,6 +56,12 @@ HOST_PROD = blog.sulfurfun.ru
 MAIN_BRANCH ?= main
 STALE_BRANCH ?=
 ENV_BRANCH ?=
+CI_WORKFLOW ?= ci.yml
+DEPLOY_WORKFLOW ?= deploy.yml
+WAIT_ATTEMPTS ?= 60
+WAIT_INTERVAL ?= 5
+PR_CHECK_ATTEMPTS ?= 30
+PR_CHECK_INTERVAL ?= 5
 
 # Проверка, что файл окружения существует
 define check_env
@@ -94,11 +101,13 @@ define require_stale_branch
 	esac
 endef
 
-# Требуем ENV_BRANCH (staging|production) для git-sync-env
+# Разрешаем синхронизацию только в staging и production
 define require_env_branch
 	@test -n "$(ENV_BRANCH)" || (echo "❌ ENV_BRANCH is required (staging|production). Usage: make git-sync-env ENV_BRANCH=staging"; exit 1)
 	@case "$(ENV_BRANCH)" in \
 		$(MAIN_BRANCH)) echo "❌ cannot sync $(MAIN_BRANCH) into itself"; exit 1 ;; \
+		staging|production) ;; \
+		*) echo "❌ unsupported ENV_BRANCH: $(ENV_BRANCH). Allowed: staging|production"; exit 1 ;; \
 	esac
 endef
 
@@ -107,7 +116,7 @@ endef
         optimize queue-restart dump restore rollout php-cs-fixer \
         validate validate-ci validate-makefile \
         git-pr git-pr-checks git-pr-merge git-sync git-sync-env git-sync-all-envs \
-        release git-checkout-main git-pull git-clean-branch git-prune git-status \
+        wait-workflow release git-checkout-main git-pull git-clean-branch git-prune git-status \
         git-clean-merged
 
 help:
@@ -137,7 +146,7 @@ help:
 	@echo "                    e.g. make php-cs-fixer ENV=dev ARGS=\"--dry-run --diff\""
 	@echo ""
 	@echo "Validation:"
-	@echo "  validate          make -n (help/up/git-pr) + actionlint (ci.yml)"
+	@echo "  validate          make -n + actionlint для всех GitHub Actions workflows"
 	@echo "  validate-makefile make -n help/up/git-pr (syntax check)"
 	@echo "  validate-ci       actionlint .github/workflows/ci.yml"
 	@echo ""
@@ -153,15 +162,16 @@ help:
 	@echo ""
 	@echo "Git (PR workflow):"
 	@echo "  git-pr            gh pr create --base $(MAIN_BRANCH) --head STALE_BRANCH --fill"
-	@echo "  git-pr-checks     gh pr checks STALE_BRANCH --watch"
+	@echo "  git-pr-checks     дождаться появления checks и проверить их результат"
 	@echo "  git-pr-merge      gh pr merge STALE_BRANCH --squash --delete-branch, then git-sync"
-	@echo "  release           git-pr + git-pr-checks + git-pr-merge + git-sync-all-envs"
+	@echo "  release           PR → checks → merge → дождаться CI/dev → staging → production"
+	@echo "  wait-workflow     дождаться workflow для точного commit SHA"
 	@echo ""
 	@echo "Git (sync/cleanup):"
 	@echo "  git-sync STALE_BRANCH=fix|feat/xxx"
 	@echo "                    checkout $(MAIN_BRANCH) → pull → branch -d STALE_BRANCH → fetch --prune"
 	@echo "  git-sync-env ENV_BRANCH=staging|production"
-	@echo "                    checkout ENV_BRANCH → pull → merge $(MAIN_BRANCH) → push"
+	@echo "                    checkout ENV_BRANCH → pull → merge origin/$(MAIN_BRANCH) → push → дождаться deploy"
 	@echo "  git-sync-all-envs sync staging and production with $(MAIN_BRANCH)"
 	@echo "  git-clean-merged  удалить все локальные ветки, слитые в $(MAIN_BRANCH)"
 	@echo "                    (кроме $(MAIN_BRANCH)/master/develop)"
@@ -279,9 +289,9 @@ php-cs-fixer:
 
 validate-ci:
 	@command -v actionlint >/dev/null 2>&1 || (echo "❌ actionlint not installed. Install: go install github.com/rhysd/actionlint/cmd/actionlint@latest"; exit 1)
-	@echo "▶ actionlint .github/workflows/ci.yml"
-	actionlint .github/workflows/ci.yml
-	@echo "✅ ci.yml OK"
+	@echo "▶ actionlint .github/workflows/*.yml"
+	actionlint .github/workflows/*.yml
+	@echo "✅ workflows OK"
 
 validate-makefile:
 	@echo "▶ make -n help"
@@ -290,6 +300,8 @@ validate-makefile:
 	@make -n up ENV=dev >/dev/null
 	@echo "▶ make -n git-pr STALE_BRANCH=test/validate"
 	@make -n git-pr STALE_BRANCH=test/validate >/dev/null
+	@echo "▶ make -n wait-workflow WORKFLOW=ci.yml BRANCH=main COMMIT_SHA=test"
+	@make -n wait-workflow WORKFLOW=ci.yml BRANCH=main COMMIT_SHA=test >/dev/null
 	@echo "✅ Makefile OK"
 
 validate: validate-makefile validate-ci
@@ -357,7 +369,19 @@ git-pr:
 
 git-pr-checks:
 	$(call require_stale_branch)
-	@echo "▶ watching checks for $(STALE_BRANCH)"
+	@set -euo pipefail; \
+	echo "▶ waiting for PR checks to appear: $(STALE_BRANCH)"; \
+	COUNT=0; \
+	for attempt in $$(seq 1 $(PR_CHECK_ATTEMPTS)); do \
+		if COUNT=$$(gh pr view "$(STALE_BRANCH)" --json statusCheckRollup --jq '(.statusCheckRollup // []) | length'); then :; else COUNT=0; fi; \
+		if [ "$$COUNT" -gt 0 ]; then break; fi; \
+		echo "⏳ no checks reported yet ($$attempt/$(PR_CHECK_ATTEMPTS))"; \
+		sleep "$(PR_CHECK_INTERVAL)"; \
+	done; \
+	if [ "$$COUNT" -eq 0 ]; then \
+		echo "❌ PR checks did not appear"; \
+		exit 1; \
+	fi; \
 	gh pr checks "$(STALE_BRANCH)" --watch
 
 git-pr-merge:
@@ -376,18 +400,57 @@ git-sync:
 	$(MAKE) git-prune
 	@echo "✅ git sync done ($(MAIN_BRANCH), removed $(STALE_BRANCH), pruned)"
 
+# Ожидание конкретного GitHub Actions workflow по branch + commit SHA.
+# Ошибка workflow останавливает release до продвижения следующего окружения.
+wait-workflow:
+	@test -n "$(WORKFLOW)" || (echo "❌ WORKFLOW is required (e.g. ci.yml)"; exit 1)
+	@test -n "$(BRANCH)" || (echo "❌ BRANCH is required"; exit 1)
+	@test -n "$(COMMIT_SHA)" || (echo "❌ COMMIT_SHA is required"; exit 1)
+	@set -euo pipefail; \
+	echo "▶ waiting for $(WORKFLOW): branch=$(BRANCH), commit=$(COMMIT_SHA)"; \
+	RUN_ID=""; \
+	for attempt in $$(seq 1 $(WAIT_ATTEMPTS)); do \
+		RUN_ID=$$(gh run list \
+			--workflow "$(WORKFLOW)" \
+			--branch "$(BRANCH)" \
+			--commit "$(COMMIT_SHA)" \
+			--event push \
+			--limit 1 \
+			--json databaseId \
+			--jq '.[0].databaseId // empty'); \
+		if [ -n "$$RUN_ID" ]; then break; fi; \
+		echo "⏳ workflow run not found yet ($$attempt/$(WAIT_ATTEMPTS))"; \
+		sleep "$(WAIT_INTERVAL)"; \
+	done; \
+	if [ -z "$$RUN_ID" ]; then \
+		echo "❌ workflow run not found: $(WORKFLOW), $(BRANCH), $(COMMIT_SHA)"; \
+		exit 1; \
+	fi; \
+	echo "▶ watching workflow run $$RUN_ID"; \
+	gh run watch "$$RUN_ID" --exit-status
+
 git-sync-env:
 	$(call require_env_branch)
 	$(call check_clean)
-	@echo "▶ git checkout $(ENV_BRANCH)"
-	git checkout "$(ENV_BRANCH)"
-	@echo "▶ git pull"
-	git pull --ff-only
-	@echo "▶ git merge $(MAIN_BRANCH)"
-	git merge "$(MAIN_BRANCH)"
-	@echo "▶ git push"
-	git push
-	@echo "✅ $(ENV_BRANCH) synced with $(MAIN_BRANCH)"
+	@set -euo pipefail; \
+	if [ "$(ENV_BRANCH)" = "staging" ]; then \
+		SOURCE_BRANCH="$(MAIN_BRANCH)"; \
+	elif [ "$(ENV_BRANCH)" = "production" ]; then \
+		SOURCE_BRANCH="staging"; \
+	fi; \
+	echo "▶ git checkout $(ENV_BRANCH)"; \
+	git checkout "$(ENV_BRANCH)"; \
+	echo "▶ git pull --ff-only"; \
+	git pull --ff-only; \
+	echo "▶ git fetch origin $$SOURCE_BRANCH"; \
+	git fetch origin "$$SOURCE_BRANCH"; \
+	echo "▶ git merge origin/$$SOURCE_BRANCH"; \
+	git merge "origin/$$SOURCE_BRANCH"; \
+	echo "▶ git push"; \
+	git push; \
+	COMMIT_SHA=$$(git rev-parse HEAD); \
+	$(MAKE) wait-workflow WORKFLOW="$(DEPLOY_WORKFLOW)" BRANCH="$(ENV_BRANCH)" COMMIT_SHA="$$COMMIT_SHA"; \
+	echo "✅ $(ENV_BRANCH) synced and deployment completed"
 
 git-sync-all-envs:
 	@echo "▶ syncing staging"
@@ -401,8 +464,13 @@ release:
 	$(MAKE) git-pr STALE_BRANCH="$(STALE_BRANCH)"
 	$(MAKE) git-pr-checks STALE_BRANCH="$(STALE_BRANCH)"
 	$(MAKE) git-pr-merge STALE_BRANCH="$(STALE_BRANCH)"
+	@set -euo pipefail; \
+	MAIN_SHA=$$(git rev-parse "origin/$(MAIN_BRANCH)"); \
+	echo "▶ main commit: $$MAIN_SHA"; \
+	$(MAKE) wait-workflow WORKFLOW="$(CI_WORKFLOW)" BRANCH="$(MAIN_BRANCH)" COMMIT_SHA="$$MAIN_SHA"; \
+	$(MAKE) wait-workflow WORKFLOW="$(DEPLOY_WORKFLOW)" BRANCH="$(MAIN_BRANCH)" COMMIT_SHA="$$MAIN_SHA"
 	$(MAKE) git-sync-all-envs
-	@echo "✅ release done ($(STALE_BRANCH) merged, staging/production synced)"
+	@echo "✅ release completed: $(STALE_BRANCH) merged; CI, dev, staging and production deployments passed"
 
 git-checkout-main:
 	$(call check_clean)

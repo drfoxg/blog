@@ -122,12 +122,22 @@ jobs:
             chmod 600 .env
             set -a; source .env; set +a
 
-            export IMAGE_TAG="sha-$(git rev-parse --short HEAD)"
+            if git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
+              IMAGE_SOURCE_SHA=$(git rev-parse HEAD^2)
+            else
+              IMAGE_SOURCE_SHA=$(git rev-parse HEAD)
+            fi
+
+            export IMAGE_TAG="sha-$(git rev-parse --short=7 "$IMAGE_SOURCE_SHA")"
+            echo "▶ Deploying image tag: $IMAGE_TAG"
+
             docker compose -f docker-compose.prod.yml --env-file .env.compose.prod pull
             docker compose -f docker-compose.prod.yml --env-file .env.compose.prod up -d
 
             docker compose -f docker-compose.prod.yml --env-file .env.compose.prod exec -T app \
               php artisan migrate --force --database=mysql_migrator
+            docker compose -f docker-compose.prod.yml --env-file .env.compose.prod exec -T app \
+              php artisan optimize:clear
             docker compose -f docker-compose.prod.yml --env-file .env.compose.prod exec -T app \
               php artisan optimize
 
