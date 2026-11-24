@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
     steps:
+      # DEV: собирается локально на сервере (docker compose build), код монтируется
+      # через bind mount. GHCR-образы для dev НЕ используются.
       - name: Deploy to dev
         uses: appleboy/ssh-action@v1
         with:
@@ -32,6 +34,8 @@ jobs:
             docker compose --env-file .env.compose.dev --env-file .env -f docker-compose.yml exec -T app php artisan queue:restart
             curl -fsS https://blog-dev.sulfurfun.ru/up > /dev/null
 
+  # STAGING: собирается локально на сервере (docker compose build), код монтируется
+  # через bind mount. GHCR-образы для staging НЕ используются.
   deploy-staging:
     name: deploy-staging
     if: github.ref == 'refs/heads/staging'
@@ -56,6 +60,8 @@ jobs:
             docker compose --env-file .env.compose.staging --env-file .env -f docker-compose.yml exec -T app php artisan queue:restart
             curl -fsS https://blog-staging.sulfurfun.ru/up > /dev/null
 
+  # PROD: использует immutable-образы из GHCR (docker compose pull).
+  # Код НЕ монтируется, .env генерируется из Secrets.
   deploy-prod:
     name: deploy-prod
     if: github.ref == 'refs/heads/production'

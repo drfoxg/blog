@@ -24,6 +24,9 @@
 #   make git-sync STALE_BRANCH=fix/xxx
 #   make git-clean-merged
 
+# dev/staging: docker compose build (локальная сборка), код монтируется через bind mount
+# prod: docker compose pull (образ из GHCR), код в образе, .env из Secrets
+
 SHELL := /bin/bash
 
 ENV ?= dev
