@@ -94,6 +94,15 @@ jobs:
           TGWS_LISTEN_PORT: test
           TGWS_HTTP_PORT: test
 
+      - name: Validate compose (staging)
+        run: docker compose --env-file .env.compose.staging -f docker-compose.staging.yml config -q
+        env:
+          REDIS_PASSWORD: test
+          TGWS_WORKER_HOST: test
+          TGWS_LISTEN_HOST: test
+          TGWS_LISTEN_PORT: test
+          TGWS_HTTP_PORT: test
+
       - name: Validate compose (prod)
         run: docker compose --env-file .env.compose.prod -f docker-compose.prod.yml config -q
         env:
