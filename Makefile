@@ -22,6 +22,9 @@
 #   make git-pr-checks STALE_BRANCH=fix/xxx
 #   make git-pr-merge STALE_BRANCH=fix/xxx
 #   make git-sync STALE_BRANCH=fix/xxx
+#   make git-sync-env ENV_BRANCH=staging
+#   make git-sync-all-envs
+#   make release STALE_BRANCH=fix/xxx
 #   make git-clean-merged
 
 # dev/staging: docker compose build (локальная сборка), код монтируется через bind mount
@@ -44,18 +47,25 @@ ENV_FILE := .env.compose.$(ENV)
 BACKUP_DIR ?= ./backups
 DUMP_FILE ?= $(BACKUP_DIR)/$(ENV)_$(shell date +%Y%m%d_%H%M%S).sql
 
+HOST_DEV = blog-dev.sulfurfun.ru
+HOST_STAGING = blog-staging.sulfurfun.ru
+HOST_PROD = blog.sulfurfun.ru
+
 # ---------- git ----------
 MAIN_BRANCH ?= main
 STALE_BRANCH ?=
+ENV_BRANCH ?=
 
 # Проверка, что файл окружения существует
 define check_env
-	@test -f $(ENV_FILE) || (echo "❌ $(ENV_FILE) not found. Use ENV=dev|staging|prod"; exit 1)
+	@test -f "$(ENV_FILE)" || (echo "❌ $(ENV_FILE) not found. Use ENV=dev|staging|prod"; exit 1)
 endef
 
 # Загрузка .env в shell (чтобы TGWS_*, REDIS_PASSWORD подставлялись без WARN)
 define load_env
-	set -a; source .env; set +a;
+	set -a; \
+	source .env || exit 1; \
+	set +a;
 endef
 
 # Защита от случайного down на prod
@@ -84,15 +94,24 @@ define require_stale_branch
 	esac
 endef
 
+# Требуем ENV_BRANCH (staging|production) для git-sync-env
+define require_env_branch
+	@test -n "$(ENV_BRANCH)" || (echo "❌ ENV_BRANCH is required (staging|production). Usage: make git-sync-env ENV_BRANCH=staging"; exit 1)
+	@case "$(ENV_BRANCH)" in \
+		$(MAIN_BRANCH)) echo "❌ cannot sync $(MAIN_BRANCH) into itself"; exit 1 ;; \
+	esac
+endef
+
 .PHONY: help up down build restart ps logs pull config up-all down-all build-all \
         migrate migrate-status migrate-status-all seed tinker shell health \
         optimize queue-restart dump restore rollout php-cs-fixer \
         validate validate-ci validate-makefile \
-        git-pr git-pr-checks git-pr-merge git-sync git-checkout-main git-pull \
-        git-clean-branch git-prune git-status git-clean-merged
+        git-pr git-pr-checks git-pr-merge git-sync git-sync-env git-sync-all-envs \
+        release git-checkout-main git-pull git-clean-branch git-prune git-status \
+        git-clean-merged
 
 help:
-	@echo "Usage: make <target> ENV=dev|staging|prod [ARGS=\"...\"] [SERVICE=...] [FILE=...] [STALE_BRANCH=...]"
+	@echo "Usage: make <target> ENV=dev|staging|prod [ARGS=\"...\"] [SERVICE=...] [FILE=...] [STALE_BRANCH=...] [ENV_BRANCH=...]"
 	@echo ""
 	@echo "Lifecycle:"
 	@echo "  up            docker compose up -d"
@@ -110,7 +129,7 @@ help:
 	@echo "  seed              php artisan db:seed --force"
 	@echo "  tinker            php artisan tinker"
 	@echo "  shell             sh inside SERVICE (default: app)"
-	@echo "  optimize          php artisan optimize"
+	@echo "  optimize          optimize:clear + optimize"
 	@echo "  queue-restart     php artisan queue:restart"
 	@echo ""
 	@echo "Code quality:"
@@ -136,10 +155,14 @@ help:
 	@echo "  git-pr            gh pr create --base $(MAIN_BRANCH) --head STALE_BRANCH --fill"
 	@echo "  git-pr-checks     gh pr checks STALE_BRANCH --watch"
 	@echo "  git-pr-merge      gh pr merge STALE_BRANCH --squash --delete-branch, then git-sync"
+	@echo "  release           git-pr + git-pr-checks + git-pr-merge + git-sync-all-envs"
 	@echo ""
 	@echo "Git (sync/cleanup):"
 	@echo "  git-sync STALE_BRANCH=fix|feat/xxx"
 	@echo "                    checkout $(MAIN_BRANCH) → pull → branch -d STALE_BRANCH → fetch --prune"
+	@echo "  git-sync-env ENV_BRANCH=staging|production"
+	@echo "                    checkout ENV_BRANCH → pull → merge $(MAIN_BRANCH) → push"
+	@echo "  git-sync-all-envs sync staging and production with $(MAIN_BRANCH)"
 	@echo "  git-clean-merged  удалить все локальные ветки, слитые в $(MAIN_BRANCH)"
 	@echo "                    (кроме $(MAIN_BRANCH)/master/develop)"
 	@echo "  git-status        краткий статус + текущая ветка"
@@ -155,8 +178,9 @@ help:
 	@echo "  make restore ENV=staging FILE=./backups/dev_20261113_112539.sql"
 	@echo "  make validate"
 	@echo "  make git-pr STALE_BRANCH=fix/dev-redis-healthcheck"
-	@echo "  make git-pr-merge STALE_BRANCH=fix/dev-redis-healthcheck"
-	@echo "  make git-sync STALE_BRANCH=fix/deploy-stability"
+	@echo "  make release STALE_BRANCH=fix/dev-redis-healthcheck"
+	@echo "  make git-sync-env ENV_BRANCH=staging"
+	@echo "  make git-sync-all-envs"
 	@echo "  make git-clean-merged"
 
 # ---------- single env ----------
@@ -164,35 +188,35 @@ help:
 up:
 	$(call check_env)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d
 
 down:
 	$(call check_env)
 	$(call confirm_prod,down)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) down
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" down
 
 build:
 	$(call check_env)
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) build
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" build
 
 restart: down up
 
 ps:
 	$(call check_env)
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) ps
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" ps
 
 logs:
 	$(call check_env)
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) logs -f $(SERVICE)
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" logs -f $(SERVICE)
 
 pull:
 	$(call check_env)
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) pull
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" pull
 
 config:
 	$(call check_env)
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) config -q
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" config -q
 	@echo "✅ $(ENV) compose OK"
 
 # ---------- migrations / artisan ----------
@@ -201,12 +225,12 @@ migrate:
 	$(call check_env)
 	$(call confirm_prod,migrate)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) php artisan migrate --force
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T "$(APP_SERVICE)" php artisan migrate --force
 
 migrate-status:
 	$(call check_env)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) php artisan migrate:status
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T "$(APP_SERVICE)" php artisan migrate:status
 
 migrate-status-all:
 	@for e in dev staging prod; do \
@@ -219,35 +243,37 @@ seed:
 	$(call check_env)
 	$(call confirm_prod,seed)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) php artisan db:seed --force
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T "$(APP_SERVICE)" php artisan db:seed --force
 
 tinker:
 	$(call check_env)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec $(APP_SERVICE) php artisan tinker
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec "$(APP_SERVICE)" php artisan tinker
 
 shell:
 	$(call check_env)
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec $(SERVICE) sh
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec $(if $(strip $(SERVICE)),"$(SERVICE)","$(APP_SERVICE)") sh
 
 optimize:
 	$(call check_env)
 	$(call confirm_prod,optimize)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) php artisan optimize
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T "$(APP_SERVICE)" php artisan optimize:clear
+	$(call load_env) \
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T "$(APP_SERVICE)" php artisan optimize
 
 queue-restart:
 	$(call check_env)
 	$(call confirm_prod,queue-restart)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) php artisan queue:restart
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T "$(APP_SERVICE)" php artisan queue:restart
 
 # ---------- code quality ----------
 
 php-cs-fixer:
 	$(call check_env)
 	$(call load_env) \
-	docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) exec -T $(APP_SERVICE) vendor/bin/php-cs-fixer fix $(ARGS)
+	docker compose --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T "$(APP_SERVICE)" vendor/bin/php-cs-fixer fix $(ARGS)
 
 # ---------- validation ----------
 
@@ -274,9 +300,9 @@ validate: validate-makefile validate-ci
 health:
 	$(call check_env)
 	@case "$(ENV)" in \
-		dev)     URL="https://blog-dev.sulfurfun.ru/up" ;; \
-		staging) URL="https://blog-staging.sulfurfun.ru/up" ;; \
-		prod)    URL="https://blog.sulfurfun.ru/up" ;; \
+		dev)     URL="https://$(HOST_DEV)/up" ;; \
+		staging) URL="https://$(HOST_STAGING)/up" ;; \
+		prod)    URL="https://$(HOST_PROD)/up" ;; \
 		*)       echo "❌ unknown ENV=$(ENV)"; exit 1 ;; \
 	esac; \
 	echo "▶ curl $$URL"; \
@@ -286,17 +312,17 @@ health:
 
 dump:
 	$(call check_env)
-	@mkdir -p $(BACKUP_DIR)
+	@mkdir -p "$(BACKUP_DIR)"
 	@echo "▶ dump $(ENV) via $(DB_CONTAINER) → $(DUMP_FILE)"
 	$(call load_env) \
 	docker exec -e MYSQL_PWD="$$DB_PASSWORD" \
 	            -e DB_USERNAME="$$DB_USERNAME" \
 	            -e DB_DATABASE="$$DB_DATABASE" \
-	  $(DB_CONTAINER) sh -c '\
+	  "$(DB_CONTAINER)" sh -c '\
 		mysqldump -h 127.0.0.1 -u "$$DB_USERNAME" \
 		--single-transaction --no-tablespaces --routines --triggers --events "$$DB_DATABASE"' \
-		> $(DUMP_FILE)
-	@echo "✅ $(DUMP_FILE) ($$(du -h $(DUMP_FILE) | cut -f1))"
+		> "$(DUMP_FILE)"
+	@echo "✅ $(DUMP_FILE) ($$(du -h "$(DUMP_FILE)" | cut -f1))"
 
 restore:
 	$(call check_env)
@@ -308,9 +334,9 @@ restore:
 	docker exec -i -e MYSQL_PWD="$$DB_PASSWORD" \
 	               -e DB_USERNAME="$$DB_USERNAME" \
 	               -e DB_DATABASE="$$DB_DATABASE" \
-	  $(DB_CONTAINER) sh -c '\
+	  "$(DB_CONTAINER)" sh -c '\
 		mysql -h 127.0.0.1 -u "$$DB_USERNAME" "$$DB_DATABASE"' \
-		< $(FILE)
+		< "$(FILE)"
 	@echo "✅ restored $(FILE) → $(ENV)"
 
 # ---------- rollout (zero-downtime, если установлен docker rollout) ----------
@@ -320,25 +346,25 @@ rollout:
 	$(call confirm_prod,rollout)
 	@command -v docker-rollout >/dev/null 2>&1 || (echo "❌ docker-rollout not installed"; exit 1)
 	$(call load_env) \
-	docker rollout $(APP_SERVICE) --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
+	docker rollout "$(APP_SERVICE)" --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)"
 
 # ---------- git: PR workflow ----------
 
 git-pr:
 	$(call require_stale_branch)
 	@echo "▶ creating PR $(STALE_BRANCH) → $(MAIN_BRANCH)"
-	gh pr create --base $(MAIN_BRANCH) --head $(STALE_BRANCH) --fill
+	gh pr create --base "$(MAIN_BRANCH)" --head "$(STALE_BRANCH)" --fill
 
 git-pr-checks:
 	$(call require_stale_branch)
 	@echo "▶ watching checks for $(STALE_BRANCH)"
-	gh pr checks $(STALE_BRANCH) --watch
+	gh pr checks "$(STALE_BRANCH)" --watch
 
 git-pr-merge:
 	$(call require_stale_branch)
 	@echo "▶ merging PR $(STALE_BRANCH) → $(MAIN_BRANCH)"
-	gh pr merge $(STALE_BRANCH) --squash --delete-branch
-	$(MAKE) git-sync STALE_BRANCH=$(STALE_BRANCH)
+	gh pr merge "$(STALE_BRANCH)" --squash --delete-branch
+	$(MAKE) git-sync STALE_BRANCH="$(STALE_BRANCH)"
 
 # ---------- git: sync/cleanup ----------
 
@@ -350,21 +376,49 @@ git-sync:
 	$(MAKE) git-prune
 	@echo "✅ git sync done ($(MAIN_BRANCH), removed $(STALE_BRANCH), pruned)"
 
+git-sync-env:
+	$(call require_env_branch)
+	$(call check_clean)
+	@echo "▶ git checkout $(ENV_BRANCH)"
+	git checkout "$(ENV_BRANCH)"
+	@echo "▶ git pull"
+	git pull --ff-only
+	@echo "▶ git merge $(MAIN_BRANCH)"
+	git merge "$(MAIN_BRANCH)"
+	@echo "▶ git push"
+	git push
+	@echo "✅ $(ENV_BRANCH) synced with $(MAIN_BRANCH)"
+
+git-sync-all-envs:
+	@echo "▶ syncing staging"
+	$(MAKE) git-sync-env ENV_BRANCH=staging
+	@echo "▶ syncing production"
+	$(MAKE) git-sync-env ENV_BRANCH=production
+	@echo "✅ staging and production synced with $(MAIN_BRANCH)"
+
+release:
+	$(call require_stale_branch)
+	$(MAKE) git-pr STALE_BRANCH="$(STALE_BRANCH)"
+	$(MAKE) git-pr-checks STALE_BRANCH="$(STALE_BRANCH)"
+	$(MAKE) git-pr-merge STALE_BRANCH="$(STALE_BRANCH)"
+	$(MAKE) git-sync-all-envs
+	@echo "✅ release done ($(STALE_BRANCH) merged, staging/production synced)"
+
 git-checkout-main:
 	$(call check_clean)
 	@echo "▶ git checkout $(MAIN_BRANCH)"
-	git checkout $(MAIN_BRANCH)
+	git checkout "$(MAIN_BRANCH)"
 
 git-pull:
 	$(call check_clean)
-	@echo "▶ git pull"
-	git pull
+	@echo "▶ git pull --ff-only"
+	git pull --ff-only
 
 git-clean-branch:
 	$(call require_stale_branch)
 	@echo "▶ git branch -d $(STALE_BRANCH) (skip if missing)"
-	@if git show-ref --verify --quiet refs/heads/$(STALE_BRANCH); then \
-		git branch -d $(STALE_BRANCH); \
+	@if git show-ref --verify --quiet "refs/heads/$(STALE_BRANCH)"; then \
+		git branch -d -- "$(STALE_BRANCH)"; \
 	else \
 		echo "ℹ️  $(STALE_BRANCH) not found, skip"; \
 	fi
@@ -379,10 +433,11 @@ git-status:
 	@echo "current branch: $$(git rev-parse --abbrev-ref HEAD)"
 	@echo "main branch:    $(MAIN_BRANCH)"
 	@echo "stale branch:   $${STALE_BRANCH:-(not set)}"
+	@echo "env branch:     $${ENV_BRANCH:-(not set)}"
 
 git-clean-merged:
 	@echo "▶ deleting local branches merged into $(MAIN_BRANCH) (except $(MAIN_BRANCH)/master/develop)"
-	@git branch --merged $(MAIN_BRANCH) \
+	@git branch --merged "$(MAIN_BRANCH)" \
 		| sed 's/^[* ] //' \
 		| grep -vE '^($(MAIN_BRANCH)|master|develop)$$' \
 		| grep -v '^$$' \
