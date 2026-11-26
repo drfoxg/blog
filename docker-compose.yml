@@ -47,7 +47,7 @@ services:
       - sqldev-backend
 
   tgwsapiproxy:
-    image: tgwsapiproxy:latest
+    image: tgwsapiproxy-dev:latest
     build:
       context: ./tgwsapiproxy
       dockerfile: Dockerfile
