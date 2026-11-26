@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: blog
+    image: blog-dev:latest
     restart: unless-stopped
     tty: true
     working_dir: /var/www
@@ -27,7 +27,7 @@ services:
       - sqldev-backend
 
   worker:
-    image: blog
+    image: blog-dev:latest
     restart: unless-stopped
     stop_grace_period: 70s
     working_dir: /var/www
