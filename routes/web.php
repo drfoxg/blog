@@ -7,5 +7,6 @@ Route::get('/', function () {
         'app' => 'blog',
         'status' => 'ok',
         'docs' => '/api/v1',
+        'release' => 'v0.0.1',
     ]);
 });
