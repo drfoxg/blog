@@ -4,6 +4,13 @@ on:
   push:
     branches: [main, staging, production]
 
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag for production (empty = current version)"
+        required: false
+        type: string
+        default: ""
 permissions:
   contents: read
 
@@ -67,6 +74,8 @@ jobs:
     if: github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     environment: production
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag }}
     steps:
       - name: Deploy to prod
         uses: appleboy/ssh-action@v1
@@ -74,6 +83,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          envs: IMAGE_TAG
           script: |
             set -euo pipefail
             cd ~/lessons-blog/prod
@@ -122,14 +132,43 @@ jobs:
             chmod 600 .env
             set -a; source .env; set +a
 
-            if git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
-              IMAGE_SOURCE_SHA=$(git rev-parse HEAD^2)
+            if [[ -n "${IMAGE_TAG:-}" ]]; then
+              # Ручное указание тега (например, rollback)
+              if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{7}$ ]]; then
+                echo "ERROR: Invalid IMAGE_TAG: $IMAGE_TAG"
+                exit 1
+              fi
             else
-              IMAGE_SOURCE_SHA=$(git rev-parse HEAD)
+              # Обычный deploy: определяем тег автоматически
+              if git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
+                IMAGE_SOURCE_SHA=$(git rev-parse HEAD^2)
+              else
+                IMAGE_SOURCE_SHA=$(git rev-parse HEAD)
+              fi
+
+              IMAGE_TAG="sha-$(git rev-parse --short=7 "$IMAGE_SOURCE_SHA")"
             fi
 
-            export IMAGE_TAG="sha-$(git rev-parse --short=7 "$IMAGE_SOURCE_SHA")"
+            export IMAGE_TAG
             echo "▶ Deploying image tag: $IMAGE_TAG"
+
+            # Проверяем наличие всех production-образов в GHCR
+            IMAGES=(
+              "ghcr.io/drfoxg/blog:${IMAGE_TAG}"
+              "ghcr.io/drfoxg/blog-nginx:${IMAGE_TAG}"
+              "ghcr.io/drfoxg/tgwsapiproxy:${IMAGE_TAG}"
+            )
+
+            for image in "${IMAGES[@]}"; do
+              echo "▶ Checking image: $image"
+
+              if ! docker manifest inspect "$image" > /dev/null 2>&1; then
+                echo "ERROR: Image not found or inaccessible: $image"
+                exit 1
+              fi
+            done
+
+            echo "✓ All production images are available"
 
             docker compose -f docker-compose.prod.yml --env-file .env.compose.prod pull
             docker compose -f docker-compose.prod.yml --env-file .env.compose.prod up -d
@@ -147,4 +186,18 @@ jobs:
               echo "queue:restart retry $i..."; sleep 3
             done
 
+            # Health check
             curl -fsS https://blog.sulfurfun.ru/up > /dev/null
+
+            # Record successful production deployment
+            DEPLOY_LOG="$HOME/lessons-blog/production-deploys.log"
+
+            DEPLOYED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+            DEPLOY_COMMIT=$(git rev-parse HEAD)
+
+            printf '%s\t%s\t%s\n' \
+              "$DEPLOYED_AT" \
+              "$IMAGE_TAG" \
+              "$DEPLOY_COMMIT" >> "$DEPLOY_LOG"
+
+            echo "✓ Deployment recorded: $IMAGE_TAG"
