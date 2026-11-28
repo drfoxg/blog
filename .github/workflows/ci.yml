@@ -83,7 +83,7 @@ jobs:
         run: php artisan test
 
       - name: Run php-cs-fixer (dry-run)
-        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+        run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php --dry-run --diff
 
       - name: Validate compose (dev)
         run: docker compose --env-file .env.compose.dev -f docker-compose.yml config -q

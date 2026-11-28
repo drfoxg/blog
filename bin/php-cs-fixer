@@ -1,2 +1,40 @@
-#!/bin/bash
-docker exec -i app /var/www/vendor/bin/php-cs-fixer "$@"
+#!/usr/bin/env bash
+
+# работает ли вообще
+# ./bin/php-cs-fixer --version
+
+# тестовый прогон
+# ./bin/php-cs-fixer fix --dry-run --diff
+
+# форматирование кода
+# ./bin/php-cs-fixer fix
+
+
+# ./bin/php-cs-fixer describe @auto --expand
+# ./bin/php-cs-fixer describe @PhpCsFixer --expand
+# Посмотреть все правила, которые реально используются твоей конфигурацией
+# ./bin/php-cs-fixer describe @ --expand
+
+# настройка Junstyle PHP CS Fixe в VS Code
+# {
+#     "php-cs-fixer.executablePath": "${workspaceFolder}/bin/php-cs-fixer",
+#     "php-cs-fixer.config": "${workspaceFolder}/.php-cs-fixer.php",
+#     "php-cs-fixer.onsave": true,
+#
+#     "[php]": {
+#         "editor.defaultFormatter": "junstyle.php-cs-fixer"
+#     }
+# }
+#
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+docker run --rm \
+    -v "$ROOT_DIR:/var/www" \
+    -v /tmp:/tmp \
+    -w /var/www \
+    --entrypoint php \
+    blog-dev:latest \
+    /var/www/vendor/bin/php-cs-fixer "$@"
